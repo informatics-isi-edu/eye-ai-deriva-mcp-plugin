@@ -1,0 +1,84 @@
+[build-system]
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+[project]
+name = "eye-ai-deriva-mcp-plugin"
+dynamic = ["version"]
+description = "Eye-AI domain RAG indexing plugin for deriva-mcp-core"
+readme = "README.md"
+license = { text = "Apache-2.0" }
+requires-python = ">=3.12"
+authors = [{ name = "Informatics and Scientific Research Division, USC" }]
+keywords = ["mcp", "deriva", "eye-ai", "rag"]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+]
+
+dependencies = [
+    "deriva-mcp-core",
+    "deriva-ml>=1.38.0",
+    "deriva @ git+https://github.com/informatics-isi-edu/deriva-py@deriva-ml",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "pytest-cov>=5.0",
+    "ruff>=0.4",
+    "bump-my-version",
+]
+system-certs = ["pip-system-certs>=5.3"]
+
+[project.entry-points."deriva_mcp.plugins"]
+eye-ai-deriva-mcp-plugin = "eye_ai_deriva_mcp_plugin.plugin:register"
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "src/eye_ai_deriva_mcp_plugin/_version.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/eye_ai_deriva_mcp_plugin"]
+
+[tool.uv]
+override-dependencies = [
+    "deriva @ git+https://github.com/informatics-isi-edu/deriva-py@deriva-ml",
+]
+
+[tool.uv.sources]
+deriva-mcp-core = { path = "../deriva-mcp-core", editable = true }
+deriva-ml = { path = "../deriva-ml", editable = true }
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["src/eye_ai_deriva_mcp_plugin/_version.py"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "W"]
+ignore = ["E402", "E501"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+addopts = "-vv -r w --tb=short --disable-warnings"
+testpaths = ["tests"]
+
+[tool.coverage.run]
+source = ["src/eye_ai_deriva_mcp_plugin"]
+omit = ["tests/*"]
+
+[tool.bumpversion]
+allow_dirty = false
+commit = true
+tag = true
+current_version = "0.1.0"
