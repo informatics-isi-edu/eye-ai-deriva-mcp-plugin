@@ -119,3 +119,53 @@ async def test_index_catalog_isolates_table_fetch_failure():
         )
     assert result["tables_indexed"] == 1
     assert result["tables_failed"] == 1
+
+
+async def test_hook_no_ops_on_non_eyeai_host(ctx):
+    submitted = []
+    ctx.submit_task = lambda coro, name="", description="": submitted.append(name) or "task-1"
+    hook = indexing.make_catalog_connect_hook(ctx)
+    await hook("other.deriva.org", "1", "hash", {})
+    assert submitted == []  # not an eye-ai host -> no task
+
+
+async def test_hook_no_ops_when_rag_disabled(ctx):
+    submitted = []
+    ctx.submit_task = lambda coro, name="", description="": submitted.append(name) or "task-1"
+    with patch("eye_ai_deriva_mcp_plugin.indexing.get_rag_store", return_value=None):
+        hook = indexing.make_catalog_connect_hook(ctx)
+        await hook("www.eye-ai.org", "5", "hash", {})
+    assert submitted == []  # RAG off -> no task
+
+
+async def test_hook_skips_when_fresh(ctx):
+    submitted = []
+    ctx.submit_task = lambda coro, name="", description="": submitted.append(name) or "task-1"
+    store = MagicMock()
+    with (
+        patch("eye_ai_deriva_mcp_plugin.indexing.get_rag_store", return_value=store),
+        patch("eye_ai_deriva_mcp_plugin.indexing._is_index_fresh", AsyncMock(return_value=True)),
+    ):
+        hook = indexing.make_catalog_connect_hook(ctx)
+        await hook("www.eye-ai.org", "5", "hash", {})
+    assert submitted == []  # fresh -> no task
+
+
+async def test_hook_submits_task_when_stale(ctx):
+    submitted = []
+
+    def _submit(coro, name="", description=""):
+        coro.close()  # avoid "coroutine never awaited" warning
+        submitted.append(name)
+        return "task-1"
+
+    ctx.submit_task = _submit
+    store = MagicMock()
+    with (
+        patch("eye_ai_deriva_mcp_plugin.indexing.get_rag_store", return_value=store),
+        patch("eye_ai_deriva_mcp_plugin.indexing._is_index_fresh", AsyncMock(return_value=False)),
+    ):
+        hook = indexing.make_catalog_connect_hook(ctx)
+        await hook("www.eye-ai.org", "5", "hash", {})
+    assert len(submitted) == 1
+    assert "www.eye-ai.org/5" in submitted[0]

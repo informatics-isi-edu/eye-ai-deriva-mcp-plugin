@@ -21,15 +21,20 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Callable
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from deriva_mcp_core import deriva_call, get_catalog
 from deriva_mcp_core.rag import get_rag_store
 from deriva_mcp_core.rag.chunker import chunk_markdown
 from deriva_mcp_core.rag.store import Chunk
 
+from eye_ai_deriva_mcp_plugin import config
 from eye_ai_deriva_mcp_plugin.serializers import EyeAIRowSerializer
+
+if TYPE_CHECKING:
+    from deriva_mcp_core.plugin.api import PluginContext
 
 logger = logging.getLogger(__name__)
 
@@ -223,3 +228,98 @@ async def _index_catalog(
         "tables_failed": tables_failed,
         "rows_indexed": rows_indexed,
     }
+
+
+async def _index_catalog_task(
+    task_id_ref: list[str],
+    hostname: str,
+    catalog_id: str,
+    tables: list[tuple[str, str]],
+    env: dict[str, str],
+) -> dict[str, int]:
+    """Background-task wrapper: re-resolve the credential, then index.
+
+    Background tasks do not carry the per-request credential contextvar,
+    so the credential is re-fetched from the TaskManager before any
+    DERIVA I/O (the authoring guide's long-task pattern). The credential
+    is set on the contextvar so ``get_catalog`` inside ``_fetch_table_rows``
+    resolves it.
+
+    Args:
+        task_id_ref: A one-element list holding this task's id. The hook
+            mutates element 0 after ``submit_task`` returns, so the task
+            body reads it lazily rather than at submission time.
+        hostname: Deriva server hostname.
+        catalog_id: Catalog ID as a string.
+        tables: Ordered ``(schema, table)`` pairs to index.
+        env: The merged environment map (``ctx.env``).
+
+    Returns:
+        ``{"tables_indexed", "tables_failed", "rows_indexed"}`` from
+        ``_index_catalog``.
+
+    Example:
+        >>> # Submitted by ``make_catalog_connect_hook``'s ``hook``:
+        >>> ref = [""]
+        >>> ref[0] = ctx.submit_task(  # doctest: +SKIP
+        ...     _index_catalog_task(ref, host, cat, tables, env), name="...",
+        ... )
+    """
+    from deriva_mcp_core.context import set_current_credential
+    from deriva_mcp_core.tasks import get_task_manager
+
+    task_id = task_id_ref[0]
+    cred = await get_task_manager().get_credential(task_id)
+    set_current_credential(cred)
+    return await _index_catalog(hostname, catalog_id, tables, env)
+
+
+def make_catalog_connect_hook(
+    ctx: PluginContext,
+) -> Callable[[str, str, str, dict], Any]:
+    """Build the ``on_catalog_connect`` hook bound to ``ctx``.
+
+    The hook host-gates, RAG-gates, and TTL-gates, then submits a
+    background ``_index_catalog_task`` for stale eye-ai catalogs.
+
+    Args:
+        ctx: The plugin context (for ``ctx.env`` and ``ctx.submit_task``).
+
+    Returns:
+        An async hook with the ``on_catalog_connect`` signature.
+
+    Example:
+        >>> hook = make_catalog_connect_hook(ctx)  # doctest: +SKIP
+        >>> await hook("www.eye-ai.org", "5", schema_hash, schema_json)
+    """
+    hosts = config.eye_ai_hosts(ctx.env)
+    tables = config.eye_ai_tables(ctx.env)
+    ttl = config.index_ttl_seconds(ctx.env)
+
+    async def hook(
+        hostname: str,
+        catalog_id: str,
+        schema_hash: str,  # noqa: ARG001 -- hook signature requires it
+        schema_json: dict,  # noqa: ARG001 -- hook signature requires it
+    ) -> None:
+        if hostname not in hosts:
+            return
+        store = get_rag_store()
+        if store is None:
+            return
+        try:
+            if await _is_index_fresh(store, hostname, catalog_id, ttl):
+                logger.debug("eye-ai RAG: index fresh for %s/%s, skipping", hostname, catalog_id)
+                return
+        except Exception:  # noqa: BLE001 -- a freshness probe failure should not block indexing
+            logger.exception("eye-ai RAG: freshness check failed for %s/%s", hostname, catalog_id)
+
+        task_id_ref: list[str] = [""]
+        task_id = ctx.submit_task(
+            _index_catalog_task(task_id_ref, hostname, catalog_id, tables, ctx.env),
+            name=f"eye-ai index {hostname}/{catalog_id}",
+            description=f"Index eye-ai tables for catalog {catalog_id}",
+        )
+        task_id_ref[0] = task_id
+
+    return hook
