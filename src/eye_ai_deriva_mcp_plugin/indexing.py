@@ -139,9 +139,7 @@ def _parse_iso(ts: str) -> datetime | None:
     return dt
 
 
-async def _is_index_fresh(
-    store: Any, hostname: str, catalog_id: str, ttl_seconds: int
-) -> bool:
+async def _is_index_fresh(store: Any, hostname: str, catalog_id: str, ttl_seconds: int) -> bool:
     """Return True if this catalog's eye-ai index is within the TTL.
 
     Reads the most recent ``indexed_at`` across the catalog's
@@ -207,9 +205,7 @@ async def _index_catalog(
     for schema, table in tables:
         source = _source_name(hostname, catalog_id, schema, table)
         try:
-            rows = await asyncio.to_thread(
-                _fetch_table_rows, hostname, catalog_id, schema, table
-            )
+            rows = await asyncio.to_thread(_fetch_table_rows, hostname, catalog_id, schema, table)
         except Exception:  # noqa: BLE001 -- one bad table must not abort the pass
             logger.exception(
                 "eye-ai RAG: fetch failed for %s:%s on %s/%s", schema, table, hostname, catalog_id
@@ -221,7 +217,11 @@ async def _index_catalog(
         rows_indexed += len(rows)
     logger.info(
         "eye-ai RAG: indexed %s/%s -- %d tables, %d failed, %d rows",
-        hostname, catalog_id, tables_indexed, tables_failed, rows_indexed,
+        hostname,
+        catalog_id,
+        tables_indexed,
+        tables_failed,
+        rows_indexed,
     )
     return {
         "tables_indexed": tables_indexed,
