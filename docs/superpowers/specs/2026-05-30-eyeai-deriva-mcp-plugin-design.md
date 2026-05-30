@@ -98,14 +98,14 @@ the merged env-file + os.environ map the framework provides):
 | `EYEAI_TABLES` | **placeholder list — finalized at spec review** | `EYEAI_DERIVA_MCP_TABLES` (comma-sep `schema:table`) | The eye-ai domain tables to index. |
 | `EYEAI_INDEX_TTL_SECONDS` | `86400` (24h) | `EYEAI_DERIVA_MCP_INDEX_TTL_SECONDS` | Skip the on-connect background index if the catalog was indexed within this window. |
 
-**Placeholder `EYEAI_TABLES` (TO BE REPLACED at spec review):**
-A sensible starting guess pending the user's curated list —
-`["eye-ai:Subject", "eye-ai:Image", "eye-ai:Observation",
-"eye-ai:Diagnosis", "eye-ai:Condition_Label"]`. The exact schema name
-and table set will be supplied by the user during spec review and
-substituted before implementation. The indexer treats this list as the
-source of truth; it does NOT auto-discover (per design decision —
-explicit curated list, not schema-walk).
+**Placeholder `EYEAI_TABLES` (build with this; user corrects later):**
+`["EyeAI:Subject", "EyeAI:Image", "EyeAI:Observation",
+"EyeAI:Diagnosis", "EyeAI:Condition_Label"]`. Per user direction,
+implementation proceeds with this placeholder; the real curated list is
+supplied later and swapped in via the one module constant + env
+override. The indexer treats this list as the source of truth; it does
+NOT auto-discover (per design decision — explicit curated list, not
+schema-walk). Schema name `EyeAI` is confirmed.
 
 ## The on-connect indexer (`indexing.py`)
 
@@ -277,13 +277,22 @@ On first connect to an eye-ai catalog with RAG enabled, the plugin
 indexes the configured eye-ai tables in the background; `rag_search`
 returns eye-ai data chunks thereafter.
 
-## Open items to finalize at spec review
+## Resolved at spec review (2026-05-30)
 
-1. **The `EYEAI_TABLES` list** — the user supplies the curated set of
-   `schema:table` names (and thus which serializers to write). The
-   placeholder above is a guess.
-2. **The eye-ai domain schema name** — confirm it is `eye-ai` (the
-   guess) vs. something else.
-3. **Whether `deriva-ml-mcp` is a co-loaded sibling** in the target
-   deployment (affects only the CLAUDE.md deployment example, not the
-   plugin code).
+- **Domain schema name:** `EyeAI` (confirmed). The placeholder
+  `EYEAI_TABLES` entries use `EyeAI:<Table>`.
+- **Co-located `deriva-ml-mcp`:** yes. The target deployment runs this
+  plugin alongside `deriva-ml-mcp`; the CLAUDE.md deployment example
+  lists both in `DERIVA_MCP_PLUGIN_ALLOWLIST` and
+  `DERIVA_MCP_EXTRA_PACKAGES`.
+
+## Still open (deferred — implement with placeholders, user corrects later)
+
+1. **The `EYEAI_TABLES` list** — the user will supply the curated set
+   of `EyeAI:<Table>` names (and thus which serializers to write).
+   Implementation proceeds with the placeholder list
+   (`EyeAI:Subject`, `EyeAI:Image`, `EyeAI:Observation`,
+   `EyeAI:Diagnosis`, `EyeAI:Condition_Label`); the list lives in one
+   module constant + an env override, so correcting it later is a
+   one-line change plus (optionally) adding/removing a serializer.
+   Per user direction: build with placeholders, correct later.
