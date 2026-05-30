@@ -11,6 +11,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from deriva_mcp_core.rag import get_rag_store
+
 from eye_ai_deriva_mcp_plugin import config
 from eye_ai_deriva_mcp_plugin.indexing import _index_catalog
 
@@ -60,6 +62,13 @@ def register_maintenance_tools(ctx: PluginContext) -> None:
 
         if hostname not in hosts:
             return json.dumps({"error": f"{hostname} is not a configured eye-ai host"})
+        if get_rag_store() is None:
+            return json.dumps(
+                {
+                    "error": "RAG is disabled on this server "
+                    "(DERIVA_MCP_RAG_ENABLED=false); nothing to index"
+                }
+            )
         try:
             result = await _index_catalog(hostname, catalog_id, tables, ctx.env)
         except Exception as exc:  # noqa: BLE001 -- surface as an error envelope

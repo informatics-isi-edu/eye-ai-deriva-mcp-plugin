@@ -121,6 +121,31 @@ async def test_index_catalog_isolates_table_fetch_failure():
     assert result["tables_failed"] == 1
 
 
+async def test_index_catalog_returns_zero_when_store_none():
+    with patch("eye_ai_deriva_mcp_plugin.indexing.get_rag_store", return_value=None):
+        result = await indexing._index_catalog("www.eye-ai.org", "5", [("EyeAI", "Subject")], {})
+    assert result == {"tables_indexed": 0, "tables_failed": 0, "rows_indexed": 0}
+
+
+async def test_index_catalog_isolates_write_failure():
+    store = MagicMock()
+    store.delete_source = AsyncMock(side_effect=RuntimeError("store add failed"))
+    store.add = AsyncMock()
+    with (
+        patch("eye_ai_deriva_mcp_plugin.indexing.get_rag_store", return_value=store),
+        patch(
+            "eye_ai_deriva_mcp_plugin.indexing._fetch_table_rows",
+            return_value=[{"RID": "1-AAAA", "Name": "S1"}],
+        ),
+    ):
+        result = await indexing._index_catalog(
+            "www.eye-ai.org", "5", [("EyeAI", "Subject"), ("EyeAI", "Image")], {}
+        )
+    # Both tables failed at the write step; neither aborted the pass.
+    assert result["tables_failed"] == 2
+    assert result["tables_indexed"] == 0
+
+
 async def test_hook_no_ops_on_non_eyeai_host(ctx):
     submitted = []
     ctx.submit_task = lambda coro, name="", description="": submitted.append(name) or "task-1"

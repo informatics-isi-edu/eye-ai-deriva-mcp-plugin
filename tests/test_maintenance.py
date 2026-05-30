@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from eye_ai_deriva_mcp_plugin.maintenance import register_maintenance_tools
 
@@ -22,9 +22,12 @@ async def test_reindex_rejects_non_eyeai_host(ctx):
 
 async def test_reindex_runs_and_returns_counts(ctx):
     register_maintenance_tools(ctx)
-    with patch(
-        "eye_ai_deriva_mcp_plugin.maintenance._index_catalog",
-        AsyncMock(return_value={"tables_indexed": 2, "tables_failed": 0, "rows_indexed": 7}),
+    with (
+        patch(
+            "eye_ai_deriva_mcp_plugin.maintenance._index_catalog",
+            AsyncMock(return_value={"tables_indexed": 2, "tables_failed": 0, "rows_indexed": 7}),
+        ),
+        patch("eye_ai_deriva_mcp_plugin.maintenance.get_rag_store", return_value=MagicMock()),
     ):
         out = json.loads(
             await ctx._mcp.tools["deriva_eye_ai_reindex_catalog"]("www.eye-ai.org", "5")
@@ -38,11 +41,24 @@ async def test_reindex_runs_and_returns_counts(ctx):
 
 async def test_reindex_error_envelope_on_failure(ctx):
     register_maintenance_tools(ctx)
-    with patch(
-        "eye_ai_deriva_mcp_plugin.maintenance._index_catalog",
-        AsyncMock(side_effect=RuntimeError("store down")),
+    with (
+        patch(
+            "eye_ai_deriva_mcp_plugin.maintenance._index_catalog",
+            AsyncMock(side_effect=RuntimeError("store down")),
+        ),
+        patch("eye_ai_deriva_mcp_plugin.maintenance.get_rag_store", return_value=MagicMock()),
     ):
         out = json.loads(
             await ctx._mcp.tools["deriva_eye_ai_reindex_catalog"]("www.eye-ai.org", "5")
         )
     assert out == {"error": "store down"}
+
+
+async def test_reindex_rag_disabled_returns_error(ctx):
+    register_maintenance_tools(ctx)
+    with patch("eye_ai_deriva_mcp_plugin.maintenance.get_rag_store", return_value=None):
+        out = json.loads(
+            await ctx._mcp.tools["deriva_eye_ai_reindex_catalog"]("www.eye-ai.org", "5")
+        )
+    assert "error" in out
+    assert "RAG" in out["error"] or "disabled" in out["error"]

@@ -206,15 +206,15 @@ async def _index_catalog(
         source = _source_name(hostname, catalog_id, schema, table)
         try:
             rows = await asyncio.to_thread(_fetch_table_rows, hostname, catalog_id, schema, table)
+            await _write_table(store, source, table, rows)
+            tables_indexed += 1
+            rows_indexed += len(rows)
         except Exception:  # noqa: BLE001 -- one bad table must not abort the pass
             logger.exception(
-                "eye-ai RAG: fetch failed for %s:%s on %s/%s", schema, table, hostname, catalog_id
+                "eye-ai RAG: index failed for %s:%s on %s/%s", schema, table, hostname, catalog_id
             )
             tables_failed += 1
             continue
-        await _write_table(store, source, table, rows)
-        tables_indexed += 1
-        rows_indexed += len(rows)
     logger.info(
         "eye-ai RAG: indexed %s/%s -- %d tables, %d failed, %d rows",
         hostname,
@@ -290,7 +290,7 @@ def make_catalog_connect_hook(
 
     Example:
         >>> hook = make_catalog_connect_hook(ctx)  # doctest: +SKIP
-        >>> await hook("www.eye-ai.org", "5", schema_hash, schema_json)
+        >>> await hook("www.eye-ai.org", "5", schema_hash, schema_json)  # doctest: +SKIP
     """
     hosts = config.eye_ai_hosts(ctx.env)
     tables = config.eye_ai_tables(ctx.env)
