@@ -1,10 +1,10 @@
-# eyeai-deriva-mcp-plugin Implementation Plan
+# eye-ai-deriva-mcp-plugin Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** A `deriva-mcp-core` plugin that indexes eye-ai catalog domain tables into the RAG vector store on connect, so `rag_search` returns eye-ai data.
 
-**Architecture:** A plugin package exposing a `register(ctx)` entry point. On connect to an eye-ai hostname, an `on_catalog_connect` hook submits a TTL-gated background task that fetches each configured `EyeAI:<table>` via generic ERMrest (`get_catalog`), serializes rows to Markdown, and writes them to the vector store under catalog-public `eyeai:{host}:{cat}:{schema}.{table}` source names (no per-user ACL split — eye-ai has none). One maintenance tool (`deriva_eyeai_reindex_catalog`) forces a re-index.
+**Architecture:** A plugin package exposing a `register(ctx)` entry point. On connect to an eye-ai hostname, an `on_catalog_connect` hook submits a TTL-gated background task that fetches each configured `EyeAI:<table>` via generic ERMrest (`get_catalog`), serializes rows to Markdown, and writes them to the vector store under catalog-public `eye-ai:{host}:{cat}:{schema}.{table}` source names (no per-user ACL split — eye-ai has none). One maintenance tool (`deriva_eye_ai_reindex_catalog`) forces a re-index.
 
 **Tech Stack:** Python 3.12+, `uv`, `deriva-mcp-core` (plugin API + RAG store), `deriva-py` (ERMrest), `ruff`, `pytest`/`pytest-asyncio`, `hatchling`/`hatch-vcs`.
 
@@ -15,12 +15,12 @@
 | File | Responsibility |
 |---|---|
 | `pyproject.toml` | Package metadata, deps, entry point, ruff/pytest/bumpversion config |
-| `src/eyeai_deriva_mcp_plugin/__init__.py` | Package marker |
-| `src/eyeai_deriva_mcp_plugin/config.py` | Host set, table list, TTL — module constants + env overrides |
-| `src/eyeai_deriva_mcp_plugin/serializers.py` | `EyeAIRowSerializer` (generic eye-ai row → Markdown) |
-| `src/eyeai_deriva_mcp_plugin/indexing.py` | `_source_name`, `_fetch_table_rows`, `_index_catalog`, `_is_index_fresh`, `make_catalog_connect_hook` |
-| `src/eyeai_deriva_mcp_plugin/maintenance.py` | `register_maintenance_tools(ctx)` → `deriva_eyeai_reindex_catalog` |
-| `src/eyeai_deriva_mcp_plugin/plugin.py` | `register(ctx)` — wires the hook + the maintenance tool |
+| `src/eye_ai_deriva_mcp_plugin/__init__.py` | Package marker |
+| `src/eye_ai_deriva_mcp_plugin/config.py` | Host set, table list, TTL — module constants + env overrides |
+| `src/eye_ai_deriva_mcp_plugin/serializers.py` | `EyeAIRowSerializer` (generic eye-ai row → Markdown) |
+| `src/eye_ai_deriva_mcp_plugin/indexing.py` | `_source_name`, `_fetch_table_rows`, `_index_catalog`, `_is_index_fresh`, `make_catalog_connect_hook` |
+| `src/eye_ai_deriva_mcp_plugin/maintenance.py` | `register_maintenance_tools(ctx)` → `deriva_eye_ai_reindex_catalog` |
+| `src/eye_ai_deriva_mcp_plugin/plugin.py` | `register(ctx)` — wires the hook + the maintenance tool |
 | `tests/conftest.py` | `_CapturingMCP` + `ctx` fixtures (from authoring guide) |
 | `tests/test_config.py` | env-override parsing |
 | `tests/test_serializers.py` | row → Markdown |
@@ -54,7 +54,7 @@
 ## Task 1: Project scaffold (pyproject, package marker, meta files)
 
 **Files:**
-- Create: `pyproject.toml`, `src/eyeai_deriva_mcp_plugin/__init__.py`, `.gitignore`, `LICENSE`
+- Create: `pyproject.toml`, `src/eye_ai_deriva_mcp_plugin/__init__.py`, `.gitignore`, `LICENSE`
 
 - [ ] **Step 1: Write `pyproject.toml`**
 
@@ -64,7 +64,7 @@ requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
 
 [project]
-name = "eyeai-deriva-mcp-plugin"
+name = "eye-ai-deriva-mcp-plugin"
 dynamic = ["version"]
 description = "Eye-AI domain RAG indexing plugin for deriva-mcp-core"
 readme = "README.md"
@@ -102,7 +102,7 @@ system-certs = ["pip-system-certs>=5.3"]
 [project.entry-points."deriva_mcp.plugins"]
 # Entry-point name == package name so the deriva-docker
 # DERIVA_MCP_PLUGIN_ALLOWLIST value works without name-vs-package confusion.
-eyeai-deriva-mcp-plugin = "eyeai_deriva_mcp_plugin.plugin:register"
+eye-ai-deriva-mcp-plugin = "eye_ai_deriva_mcp_plugin.plugin:register"
 
 [tool.hatch.metadata]
 # Required so the `deriva @ git+...` direct URL is allowed in wheel METADATA.
@@ -112,10 +112,10 @@ allow-direct-references = true
 source = "vcs"
 
 [tool.hatch.build.hooks.vcs]
-version-file = "src/eyeai_deriva_mcp_plugin/_version.py"
+version-file = "src/eye_ai_deriva_mcp_plugin/_version.py"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/eyeai_deriva_mcp_plugin"]
+packages = ["src/eye_ai_deriva_mcp_plugin"]
 
 [tool.uv]
 # Force the deriva-ml branch locally, overriding deriva-mcp-core's @master pin.
@@ -130,7 +130,7 @@ deriva-ml = { path = "../deriva-ml", editable = true }
 [tool.ruff]
 line-length = 100
 target-version = "py312"
-extend-exclude = ["src/eyeai_deriva_mcp_plugin/_version.py"]
+extend-exclude = ["src/eye_ai_deriva_mcp_plugin/_version.py"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "W"]
@@ -142,7 +142,7 @@ addopts = "-vv -r w --tb=short --disable-warnings"
 testpaths = ["tests"]
 
 [tool.coverage.run]
-source = ["src/eyeai_deriva_mcp_plugin"]
+source = ["src/eye_ai_deriva_mcp_plugin"]
 omit = ["tests/*"]
 
 [tool.bumpversion]
@@ -152,7 +152,7 @@ tag = true
 current_version = "0.1.0"
 ```
 
-- [ ] **Step 2: Write `src/eyeai_deriva_mcp_plugin/__init__.py`**
+- [ ] **Step 2: Write `src/eye_ai_deriva_mcp_plugin/__init__.py`**
 
 ```python
 """Eye-AI domain RAG indexing plugin for deriva-mcp-core."""
@@ -187,7 +187,7 @@ Expected: resolves and installs `deriva-mcp-core`, `deriva-ml`, `deriva` (deriva
 - [ ] **Step 6: Commit**
 
 ```bash
-git add pyproject.toml src/eyeai_deriva_mcp_plugin/__init__.py .gitignore LICENSE uv.lock
+git add pyproject.toml src/eye_ai_deriva_mcp_plugin/__init__.py .gitignore LICENSE uv.lock
 git commit -m "chore: project scaffold (pyproject, package, license, gitignore)"
 ```
 
@@ -196,7 +196,7 @@ git commit -m "chore: project scaffold (pyproject, package, license, gitignore)"
 ## Task 2: Config module
 
 **Files:**
-- Create: `src/eyeai_deriva_mcp_plugin/config.py`
+- Create: `src/eye_ai_deriva_mcp_plugin/config.py`
 - Test: `tests/test_config.py`, `tests/conftest.py`
 
 - [ ] **Step 1: Write `tests/conftest.py`** (shared fixtures; from the authoring guide)
@@ -252,21 +252,21 @@ def ctx(mcp):
 
 from __future__ import annotations
 
-from eyeai_deriva_mcp_plugin import config
+from eye_ai_deriva_mcp_plugin import config
 
 
 def test_default_hosts():
-    assert config.eyeai_hosts({}) == {"www.eye-ai.org", "dev.eye-ai.org"}
+    assert config.eye_ai_hosts({}) == {"www.eye-ai.org", "dev.eye-ai.org"}
 
 
 def test_hosts_env_override():
-    env = {"EYEAI_DERIVA_MCP_HOSTS": "a.eye-ai.org, b.eye-ai.org"}
-    assert config.eyeai_hosts(env) == {"a.eye-ai.org", "b.eye-ai.org"}
+    env = {"EYE_AI_DERIVA_MCP_HOSTS": "a.eye-ai.org, b.eye-ai.org"}
+    assert config.eye_ai_hosts(env) == {"a.eye-ai.org", "b.eye-ai.org"}
 
 
 def test_default_tables():
     # Placeholder set; corrected later by the user.
-    assert config.eyeai_tables({}) == [
+    assert config.eye_ai_tables({}) == [
         ("EyeAI", "Subject"),
         ("EyeAI", "Image"),
         ("EyeAI", "Observation"),
@@ -276,8 +276,8 @@ def test_default_tables():
 
 
 def test_tables_env_override():
-    env = {"EYEAI_DERIVA_MCP_TABLES": "EyeAI:Subject, EyeAI:Image"}
-    assert config.eyeai_tables(env) == [("EyeAI", "Subject"), ("EyeAI", "Image")]
+    env = {"EYE_AI_DERIVA_MCP_TABLES": "EyeAI:Subject, EyeAI:Image"}
+    assert config.eye_ai_tables(env) == [("EyeAI", "Subject"), ("EyeAI", "Image")]
 
 
 def test_default_ttl():
@@ -285,15 +285,15 @@ def test_default_ttl():
 
 
 def test_ttl_env_override():
-    assert config.index_ttl_seconds({"EYEAI_DERIVA_MCP_INDEX_TTL_SECONDS": "3600"}) == 3600
+    assert config.index_ttl_seconds({"EYE_AI_DERIVA_MCP_INDEX_TTL_SECONDS": "3600"}) == 3600
 ```
 
 - [ ] **Step 3: Run to verify it fails**
 
 Run: `uv run pytest tests/test_config.py -v`
-Expected: FAIL — `ModuleNotFoundError` / `AttributeError: module 'config' has no attribute 'eyeai_hosts'`.
+Expected: FAIL — `ModuleNotFoundError` / `AttributeError: module 'config' has no attribute 'eye_ai_hosts'`.
 
-- [ ] **Step 4: Write `src/eyeai_deriva_mcp_plugin/config.py`**
+- [ ] **Step 4: Write `src/eye_ai_deriva_mcp_plugin/config.py`**
 
 ```python
 """Configuration for the eye-ai RAG indexer.
@@ -323,10 +323,10 @@ _DEFAULT_TABLES = (
 _DEFAULT_TTL_SECONDS = 86400  # 24h
 
 
-def eyeai_hosts(env: dict[str, str]) -> set[str]:
+def eye_ai_hosts(env: dict[str, str]) -> set[str]:
     """Return the set of hostnames that trigger eye-ai indexing.
 
-    Env override ``EYEAI_DERIVA_MCP_HOSTS`` is a comma-separated list.
+    Env override ``EYE_AI_DERIVA_MCP_HOSTS`` is a comma-separated list.
 
     Args:
         env: The merged environment map (``ctx.env``).
@@ -336,19 +336,19 @@ def eyeai_hosts(env: dict[str, str]) -> set[str]:
         in this set.
 
     Example:
-        >>> eyeai_hosts({})
+        >>> eye_ai_hosts({})
         {'www.eye-ai.org', 'dev.eye-ai.org'}
     """
-    raw = env.get("EYEAI_DERIVA_MCP_HOSTS")
+    raw = env.get("EYE_AI_DERIVA_MCP_HOSTS")
     if not raw:
         return set(_DEFAULT_HOSTS)
     return {h.strip() for h in raw.split(",") if h.strip()}
 
 
-def eyeai_tables(env: dict[str, str]) -> list[tuple[str, str]]:
+def eye_ai_tables(env: dict[str, str]) -> list[tuple[str, str]]:
     """Return the ordered list of (schema, table) pairs to index.
 
-    Env override ``EYEAI_DERIVA_MCP_TABLES`` is a comma-separated list
+    Env override ``EYE_AI_DERIVA_MCP_TABLES`` is a comma-separated list
     of ``schema:table`` tokens.
 
     Args:
@@ -358,10 +358,10 @@ def eyeai_tables(env: dict[str, str]) -> list[tuple[str, str]]:
         Ordered list of ``(schema, table)`` tuples.
 
     Example:
-        >>> eyeai_tables({"EYEAI_DERIVA_MCP_TABLES": "EyeAI:Subject"})
+        >>> eye_ai_tables({"EYE_AI_DERIVA_MCP_TABLES": "EyeAI:Subject"})
         [('EyeAI', 'Subject')]
     """
-    raw = env.get("EYEAI_DERIVA_MCP_TABLES")
+    raw = env.get("EYE_AI_DERIVA_MCP_TABLES")
     if not raw:
         return list(_DEFAULT_TABLES)
     out: list[tuple[str, str]] = []
@@ -377,7 +377,7 @@ def eyeai_tables(env: dict[str, str]) -> list[tuple[str, str]]:
 def index_ttl_seconds(env: dict[str, str]) -> int:
     """Return the re-index TTL in seconds.
 
-    Env override ``EYEAI_DERIVA_MCP_INDEX_TTL_SECONDS``. The on-connect
+    Env override ``EYE_AI_DERIVA_MCP_INDEX_TTL_SECONDS``. The on-connect
     hook skips the background index if the catalog was indexed within
     this window; the manual reindex tool bypasses it.
 
@@ -391,7 +391,7 @@ def index_ttl_seconds(env: dict[str, str]) -> int:
         >>> index_ttl_seconds({})
         86400
     """
-    raw = env.get("EYEAI_DERIVA_MCP_INDEX_TTL_SECONDS")
+    raw = env.get("EYE_AI_DERIVA_MCP_INDEX_TTL_SECONDS")
     if not raw:
         return _DEFAULT_TTL_SECONDS
     try:
@@ -408,7 +408,7 @@ Expected: PASS — 6 tests.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add tests/conftest.py tests/test_config.py src/eyeai_deriva_mcp_plugin/config.py
+git add tests/conftest.py tests/test_config.py src/eye_ai_deriva_mcp_plugin/config.py
 git commit -m "feat(config): host set, table list, TTL with env overrides"
 ```
 
@@ -417,7 +417,7 @@ git commit -m "feat(config): host set, table list, TTL with env overrides"
 ## Task 3: Row serializer
 
 **Files:**
-- Create: `src/eyeai_deriva_mcp_plugin/serializers.py`
+- Create: `src/eye_ai_deriva_mcp_plugin/serializers.py`
 - Test: `tests/test_serializers.py`
 
 - [ ] **Step 1: Write the failing test `tests/test_serializers.py`**
@@ -427,7 +427,7 @@ git commit -m "feat(config): host set, table list, TTL with env overrides"
 
 from __future__ import annotations
 
-from eyeai_deriva_mcp_plugin.serializers import EyeAIRowSerializer
+from eye_ai_deriva_mcp_plugin.serializers import EyeAIRowSerializer
 
 
 def test_serialize_renders_header_and_fields():
@@ -459,9 +459,9 @@ def test_serialize_returns_none_for_rid_less_row():
 - [ ] **Step 2: Run to verify it fails**
 
 Run: `uv run pytest tests/test_serializers.py -v`
-Expected: FAIL — `ModuleNotFoundError: eyeai_deriva_mcp_plugin.serializers`.
+Expected: FAIL — `ModuleNotFoundError: eye_ai_deriva_mcp_plugin.serializers`.
 
-- [ ] **Step 3: Write `src/eyeai_deriva_mcp_plugin/serializers.py`**
+- [ ] **Step 3: Write `src/eye_ai_deriva_mcp_plugin/serializers.py`**
 
 ```python
 """Markdown serialization of eye-ai catalog rows for RAG indexing.
@@ -524,7 +524,7 @@ Expected: PASS — 3 tests.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add tests/test_serializers.py src/eyeai_deriva_mcp_plugin/serializers.py
+git add tests/test_serializers.py src/eye_ai_deriva_mcp_plugin/serializers.py
 git commit -m "feat(serializers): generic eye-ai row -> Markdown"
 ```
 
@@ -533,7 +533,7 @@ git commit -m "feat(serializers): generic eye-ai row -> Markdown"
 ## Task 4: Indexing core — source name + fetch + write
 
 **Files:**
-- Create: `src/eyeai_deriva_mcp_plugin/indexing.py`
+- Create: `src/eye_ai_deriva_mcp_plugin/indexing.py`
 - Test: `tests/test_indexing.py`
 
 - [ ] **Step 1: Write the failing test (source name + fetch + write_table)**
@@ -547,13 +547,13 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from eyeai_deriva_mcp_plugin import indexing
+from eye_ai_deriva_mcp_plugin import indexing
 
 
 def test_source_name_shape():
     assert (
         indexing._source_name("www.eye-ai.org", "5", "EyeAI", "Subject")
-        == "eyeai:www.eye-ai.org:5:EyeAI.Subject"
+        == "eye-ai:www.eye-ai.org:5:EyeAI.Subject"
     )
 
 
@@ -562,7 +562,7 @@ def test_fetch_table_rows_builds_ermrest_path():
     resp = MagicMock()
     resp.json.return_value = [{"RID": "1-AAAA"}]
     catalog.get.return_value = resp
-    with patch("eyeai_deriva_mcp_plugin.indexing.get_catalog", return_value=catalog):
+    with patch("eye_ai_deriva_mcp_plugin.indexing.get_catalog", return_value=catalog):
         rows = indexing._fetch_table_rows("www.eye-ai.org", "5", "EyeAI", "Subject")
     catalog.get.assert_called_once_with("/entity/EyeAI:Subject")
     assert rows == [{"RID": "1-AAAA"}]
@@ -595,9 +595,9 @@ async def test_write_table_empty_rows_skips_add():
 - [ ] **Step 2: Run to verify it fails**
 
 Run: `uv run pytest tests/test_indexing.py -v`
-Expected: FAIL — `ModuleNotFoundError: eyeai_deriva_mcp_plugin.indexing`.
+Expected: FAIL — `ModuleNotFoundError: eye_ai_deriva_mcp_plugin.indexing`.
 
-- [ ] **Step 3: Write the first half of `src/eyeai_deriva_mcp_plugin/indexing.py`**
+- [ ] **Step 3: Write the first half of `src/eye_ai_deriva_mcp_plugin/indexing.py`**
 
 ```python
 """On-connect eye-ai catalog indexing.
@@ -606,9 +606,9 @@ When a tool connects to an eye-ai catalog, an ``on_catalog_connect``
 hook submits a background task that fetches each configured
 ``EyeAI:<table>``, serializes its rows to Markdown, and writes them to
 the RAG vector store under a catalog-public source name
-``eyeai:{host}:{cat}:{schema}.{table}``.
+``eye-ai:{host}:{cat}:{schema}.{table}``.
 
-The ``eyeai:`` source prefix is deliberately NOT one of the prefixes
+The ``eye-ai:`` source prefix is deliberately NOT one of the prefixes
 the upstream ``rag_search`` user-id filter gates on (``data:``,
 ``schema:``, ``enriched:``), so the chunks are served to all authorized
 users. This is correct because the eye-ai catalog has auth-gating but
@@ -633,8 +633,8 @@ from deriva_mcp_core.rag import get_rag_store
 from deriva_mcp_core.rag.chunker import chunk_markdown
 from deriva_mcp_core.rag.store import Chunk
 
-from eyeai_deriva_mcp_plugin import config
-from eyeai_deriva_mcp_plugin.serializers import EyeAIRowSerializer
+from eye_ai_deriva_mcp_plugin import config
+from eye_ai_deriva_mcp_plugin.serializers import EyeAIRowSerializer
 
 if TYPE_CHECKING:
     from deriva_mcp_core.plugin.api import PluginContext
@@ -643,21 +643,21 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 _SERIALIZER = EyeAIRowSerializer()
-_DOC_TYPE = "eyeai-data"
+_DOC_TYPE = "eye-ai-data"
 
 
 def _source_name(hostname: str, catalog_id: str, schema: str, table: str) -> str:
     """Build the catalog-public source name for one eye-ai table.
 
-    Shape: ``eyeai:{host}:{cat}:{schema}.{table}``. The ``eyeai:``
+    Shape: ``eye-ai:{host}:{cat}:{schema}.{table}``. The ``eye-ai:``
     prefix bypasses the upstream per-user ``data:`` filter so all users
     see the chunks.
 
     Example:
         >>> _source_name("www.eye-ai.org", "5", "EyeAI", "Subject")
-        'eyeai:www.eye-ai.org:5:EyeAI.Subject'
+        'eye-ai:www.eye-ai.org:5:EyeAI.Subject'
     """
-    return f"eyeai:{hostname}:{catalog_id}:{schema}.{table}"
+    return f"eye-ai:{hostname}:{catalog_id}:{schema}.{table}"
 
 
 def _fetch_table_rows(
@@ -711,7 +711,7 @@ async def _write_table(
         try:
             rendered = _SERIALIZER.serialize(table, row)
         except Exception:  # noqa: BLE001 -- one bad row must not poison the table
-            logger.exception("eyeai RAG: serialize failed for %s row %r", table, row.get("RID"))
+            logger.exception("eye-ai RAG: serialize failed for %s row %r", table, row.get("RID"))
             continue
         if rendered is None:
             continue
@@ -740,7 +740,7 @@ Expected: PASS — 4 tests (`_source_name`, `_fetch_table_rows`, `_write_table` 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add tests/test_indexing.py src/eyeai_deriva_mcp_plugin/indexing.py
+git add tests/test_indexing.py src/eye_ai_deriva_mcp_plugin/indexing.py
 git commit -m "feat(indexing): source name, ERMrest fetch, per-table write"
 ```
 
@@ -749,40 +749,40 @@ git commit -m "feat(indexing): source name, ERMrest fetch, per-table write"
 ## Task 5: Indexing core — freshness + full-catalog index
 
 **Files:**
-- Modify: `src/eyeai_deriva_mcp_plugin/indexing.py` (append functions)
+- Modify: `src/eye_ai_deriva_mcp_plugin/indexing.py` (append functions)
 - Test: `tests/test_indexing.py` (append tests)
 
 - [ ] **Step 1: Append failing tests to `tests/test_indexing.py`**
 
 ```python
 async def test_is_index_fresh_true_within_ttl():
-    from eyeai_deriva_mcp_plugin import indexing as idx
+    from eye_ai_deriva_mcp_plugin import indexing as idx
     from deriva_mcp_core.rag.store import SourceStats
 
     now_iso = datetime.now(timezone.utc).isoformat()
     store = MagicMock()
     store.source_stats = AsyncMock(
-        return_value={"eyeai:www.eye-ai.org:5:EyeAI.Subject": SourceStats(3, now_iso)}
+        return_value={"eye-ai:www.eye-ai.org:5:EyeAI.Subject": SourceStats(3, now_iso)}
     )
     fresh = await idx._is_index_fresh(store, "www.eye-ai.org", "5", ttl_seconds=86400)
     assert fresh is True
 
 
 async def test_is_index_fresh_false_when_stale():
-    from eyeai_deriva_mcp_plugin import indexing as idx
+    from eye_ai_deriva_mcp_plugin import indexing as idx
     from deriva_mcp_core.rag.store import SourceStats
 
     old_iso = "2000-01-01T00:00:00+00:00"
     store = MagicMock()
     store.source_stats = AsyncMock(
-        return_value={"eyeai:www.eye-ai.org:5:EyeAI.Subject": SourceStats(3, old_iso)}
+        return_value={"eye-ai:www.eye-ai.org:5:EyeAI.Subject": SourceStats(3, old_iso)}
     )
     fresh = await idx._is_index_fresh(store, "www.eye-ai.org", "5", ttl_seconds=86400)
     assert fresh is False
 
 
 async def test_is_index_fresh_false_when_no_sources():
-    from eyeai_deriva_mcp_plugin import indexing as idx
+    from eye_ai_deriva_mcp_plugin import indexing as idx
 
     store = MagicMock()
     store.source_stats = AsyncMock(return_value={})
@@ -795,15 +795,15 @@ from datetime import datetime, timezone  # noqa: E402
 
 
 async def test_index_catalog_indexes_each_configured_table():
-    from eyeai_deriva_mcp_plugin import indexing as idx
+    from eye_ai_deriva_mcp_plugin import indexing as idx
 
     store = MagicMock()
     store.delete_source = AsyncMock()
     store.add = AsyncMock()
     with (
-        patch("eyeai_deriva_mcp_plugin.indexing.get_rag_store", return_value=store),
+        patch("eye_ai_deriva_mcp_plugin.indexing.get_rag_store", return_value=store),
         patch(
-            "eyeai_deriva_mcp_plugin.indexing._fetch_table_rows",
+            "eye_ai_deriva_mcp_plugin.indexing._fetch_table_rows",
             return_value=[{"RID": "1-AAAA", "Name": "S1"}],
         ),
     ):
@@ -818,7 +818,7 @@ async def test_index_catalog_indexes_each_configured_table():
 
 
 async def test_index_catalog_isolates_table_fetch_failure():
-    from eyeai_deriva_mcp_plugin import indexing as idx
+    from eye_ai_deriva_mcp_plugin import indexing as idx
 
     store = MagicMock()
     store.delete_source = AsyncMock()
@@ -830,8 +830,8 @@ async def test_index_catalog_isolates_table_fetch_failure():
         return [{"RID": "1-AAAA"}]
 
     with (
-        patch("eyeai_deriva_mcp_plugin.indexing.get_rag_store", return_value=store),
-        patch("eyeai_deriva_mcp_plugin.indexing._fetch_table_rows", side_effect=_fetch),
+        patch("eye_ai_deriva_mcp_plugin.indexing.get_rag_store", return_value=store),
+        patch("eye_ai_deriva_mcp_plugin.indexing._fetch_table_rows", side_effect=_fetch),
     ):
         result = await idx._index_catalog(
             "www.eye-ai.org", "5", [("EyeAI", "Subject"), ("EyeAI", "Image")], {}
@@ -846,7 +846,7 @@ async def test_index_catalog_isolates_table_fetch_failure():
 Run: `uv run pytest tests/test_indexing.py -v -k "fresh or index_catalog"`
 Expected: FAIL — `_is_index_fresh` / `_index_catalog` not defined.
 
-- [ ] **Step 3: Append to `src/eyeai_deriva_mcp_plugin/indexing.py`**
+- [ ] **Step 3: Append to `src/eye_ai_deriva_mcp_plugin/indexing.py`**
 
 ```python
 def _parse_iso(ts: str) -> datetime | None:
@@ -866,7 +866,7 @@ async def _is_index_fresh(
     """Return True if this catalog's eye-ai index is within the TTL.
 
     Reads the most recent ``indexed_at`` across the catalog's
-    ``eyeai:{host}:{cat}:`` sources from ``store.source_stats()``. If
+    ``eye-ai:{host}:{cat}:`` sources from ``store.source_stats()``. If
     none exist (never indexed) or the freshest is older than the TTL,
     returns False.
 
@@ -881,7 +881,7 @@ async def _is_index_fresh(
     """
     if ttl_seconds <= 0:
         return False
-    prefix = f"eyeai:{hostname}:{catalog_id}:"
+    prefix = f"eye-ai:{hostname}:{catalog_id}:"
     stats = await store.source_stats()
     newest: datetime | None = None
     for source, stat in stats.items():
@@ -919,7 +919,7 @@ async def _index_catalog(
     """
     store = get_rag_store()
     if store is None:
-        logger.debug("eyeai RAG: store unavailable, skipping index of %s/%s", hostname, catalog_id)
+        logger.debug("eye-ai RAG: store unavailable, skipping index of %s/%s", hostname, catalog_id)
         return {"tables_indexed": 0, "tables_failed": 0, "rows_indexed": 0}
 
     tables_indexed = 0
@@ -932,14 +932,14 @@ async def _index_catalog(
                 _fetch_table_rows, hostname, catalog_id, schema, table
             )
         except Exception:  # noqa: BLE001 -- one bad table must not abort the pass
-            logger.exception("eyeai RAG: fetch failed for %s:%s on %s/%s", schema, table, hostname, catalog_id)
+            logger.exception("eye-ai RAG: fetch failed for %s:%s on %s/%s", schema, table, hostname, catalog_id)
             tables_failed += 1
             continue
         await _write_table(store, source, table, rows)
         tables_indexed += 1
         rows_indexed += len(rows)
     logger.info(
-        "eyeai RAG: indexed %s/%s -- %d tables, %d failed, %d rows",
+        "eye-ai RAG: indexed %s/%s -- %d tables, %d failed, %d rows",
         hostname, catalog_id, tables_indexed, tables_failed, rows_indexed,
     )
     return {
@@ -957,7 +957,7 @@ Expected: PASS — the prior 4 plus the 5 new (freshness x3, index_catalog x2).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add tests/test_indexing.py src/eyeai_deriva_mcp_plugin/indexing.py
+git add tests/test_indexing.py src/eye_ai_deriva_mcp_plugin/indexing.py
 git commit -m "feat(indexing): TTL freshness check + full-catalog index pass"
 ```
 
@@ -966,14 +966,14 @@ git commit -m "feat(indexing): TTL freshness check + full-catalog index pass"
 ## Task 6: The on_catalog_connect hook factory
 
 **Files:**
-- Modify: `src/eyeai_deriva_mcp_plugin/indexing.py` (append `make_catalog_connect_hook`)
+- Modify: `src/eye_ai_deriva_mcp_plugin/indexing.py` (append `make_catalog_connect_hook`)
 - Test: `tests/test_indexing.py` (append hook tests)
 
 - [ ] **Step 1: Append failing hook tests**
 
 ```python
-async def test_hook_no_ops_on_non_eyeai_host(ctx):
-    from eyeai_deriva_mcp_plugin import indexing as idx
+async def test_hook_no_ops_on_non_eye_ai_host(ctx):
+    from eye_ai_deriva_mcp_plugin import indexing as idx
 
     submitted = []
     ctx.submit_task = lambda coro, name="", description="": submitted.append(name) or "task-1"
@@ -983,25 +983,25 @@ async def test_hook_no_ops_on_non_eyeai_host(ctx):
 
 
 async def test_hook_no_ops_when_rag_disabled(ctx):
-    from eyeai_deriva_mcp_plugin import indexing as idx
+    from eye_ai_deriva_mcp_plugin import indexing as idx
 
     submitted = []
     ctx.submit_task = lambda coro, name="", description="": submitted.append(name) or "task-1"
-    with patch("eyeai_deriva_mcp_plugin.indexing.get_rag_store", return_value=None):
+    with patch("eye_ai_deriva_mcp_plugin.indexing.get_rag_store", return_value=None):
         hook = idx.make_catalog_connect_hook(ctx)
         await hook("www.eye-ai.org", "5", "hash", {})
     assert submitted == []  # RAG off -> no task
 
 
 async def test_hook_skips_when_fresh(ctx):
-    from eyeai_deriva_mcp_plugin import indexing as idx
+    from eye_ai_deriva_mcp_plugin import indexing as idx
 
     submitted = []
     ctx.submit_task = lambda coro, name="", description="": submitted.append(name) or "task-1"
     store = MagicMock()
     with (
-        patch("eyeai_deriva_mcp_plugin.indexing.get_rag_store", return_value=store),
-        patch("eyeai_deriva_mcp_plugin.indexing._is_index_fresh", AsyncMock(return_value=True)),
+        patch("eye_ai_deriva_mcp_plugin.indexing.get_rag_store", return_value=store),
+        patch("eye_ai_deriva_mcp_plugin.indexing._is_index_fresh", AsyncMock(return_value=True)),
     ):
         hook = idx.make_catalog_connect_hook(ctx)
         await hook("www.eye-ai.org", "5", "hash", {})
@@ -1009,7 +1009,7 @@ async def test_hook_skips_when_fresh(ctx):
 
 
 async def test_hook_submits_task_when_stale(ctx):
-    from eyeai_deriva_mcp_plugin import indexing as idx
+    from eye_ai_deriva_mcp_plugin import indexing as idx
 
     submitted = []
 
@@ -1021,8 +1021,8 @@ async def test_hook_submits_task_when_stale(ctx):
     ctx.submit_task = _submit
     store = MagicMock()
     with (
-        patch("eyeai_deriva_mcp_plugin.indexing.get_rag_store", return_value=store),
-        patch("eyeai_deriva_mcp_plugin.indexing._is_index_fresh", AsyncMock(return_value=False)),
+        patch("eye_ai_deriva_mcp_plugin.indexing.get_rag_store", return_value=store),
+        patch("eye_ai_deriva_mcp_plugin.indexing._is_index_fresh", AsyncMock(return_value=False)),
     ):
         hook = idx.make_catalog_connect_hook(ctx)
         await hook("www.eye-ai.org", "5", "hash", {})
@@ -1035,7 +1035,7 @@ async def test_hook_submits_task_when_stale(ctx):
 Run: `uv run pytest tests/test_indexing.py -v -k hook`
 Expected: FAIL — `make_catalog_connect_hook` not defined.
 
-- [ ] **Step 3: Append to `src/eyeai_deriva_mcp_plugin/indexing.py`**
+- [ ] **Step 3: Append to `src/eye_ai_deriva_mcp_plugin/indexing.py`**
 
 ```python
 async def _index_catalog_task(
@@ -1076,8 +1076,8 @@ def make_catalog_connect_hook(
     Returns:
         An async hook with the ``on_catalog_connect`` signature.
     """
-    hosts = config.eyeai_hosts(ctx.env)
-    tables = config.eyeai_tables(ctx.env)
+    hosts = config.eye_ai_hosts(ctx.env)
+    tables = config.eye_ai_tables(ctx.env)
     ttl = config.index_ttl_seconds(ctx.env)
 
     async def hook(
@@ -1093,15 +1093,15 @@ def make_catalog_connect_hook(
             return
         try:
             if await _is_index_fresh(store, hostname, catalog_id, ttl):
-                logger.debug("eyeai RAG: index fresh for %s/%s, skipping", hostname, catalog_id)
+                logger.debug("eye-ai RAG: index fresh for %s/%s, skipping", hostname, catalog_id)
                 return
         except Exception:  # noqa: BLE001 -- a freshness probe failure should not block indexing
-            logger.exception("eyeai RAG: freshness check failed for %s/%s", hostname, catalog_id)
+            logger.exception("eye-ai RAG: freshness check failed for %s/%s", hostname, catalog_id)
 
         task_id_ref: list[str] = [""]
         task_id = ctx.submit_task(
             _index_catalog_task(task_id_ref, hostname, catalog_id, tables, ctx.env),
-            name=f"eyeai index {hostname}/{catalog_id}",
+            name=f"eye-ai index {hostname}/{catalog_id}",
             description=f"Index eye-ai tables for catalog {catalog_id}",
         )
         task_id_ref[0] = task_id
@@ -1117,7 +1117,7 @@ Expected: PASS — all (fetch/write/fresh/index_catalog/hook).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add tests/test_indexing.py src/eyeai_deriva_mcp_plugin/indexing.py
+git add tests/test_indexing.py src/eye_ai_deriva_mcp_plugin/indexing.py
 git commit -m "feat(indexing): on_catalog_connect hook with host/RAG/TTL gating"
 ```
 
@@ -1126,7 +1126,7 @@ git commit -m "feat(indexing): on_catalog_connect hook with host/RAG/TTL gating"
 ## Task 7: Maintenance tool
 
 **Files:**
-- Create: `src/eyeai_deriva_mcp_plugin/maintenance.py`
+- Create: `src/eye_ai_deriva_mcp_plugin/maintenance.py`
 - Test: `tests/test_maintenance.py`
 
 - [ ] **Step 1: Write the failing test `tests/test_maintenance.py`**
@@ -1139,18 +1139,18 @@ from __future__ import annotations
 import json
 from unittest.mock import AsyncMock, patch
 
-from eyeai_deriva_mcp_plugin.maintenance import register_maintenance_tools
+from eye_ai_deriva_mcp_plugin.maintenance import register_maintenance_tools
 
 
 async def test_reindex_tool_registered(ctx):
     register_maintenance_tools(ctx)
-    assert "deriva_eyeai_reindex_catalog" in ctx._mcp.tools
+    assert "deriva_eye_ai_reindex_catalog" in ctx._mcp.tools
 
 
-async def test_reindex_rejects_non_eyeai_host(ctx):
+async def test_reindex_rejects_non_eye_ai_host(ctx):
     register_maintenance_tools(ctx)
     out = json.loads(
-        await ctx._mcp.tools["deriva_eyeai_reindex_catalog"]("other.org", "1")
+        await ctx._mcp.tools["deriva_eye_ai_reindex_catalog"]("other.org", "1")
     )
     assert "error" in out
     assert "eye-ai" in out["error"]
@@ -1159,11 +1159,11 @@ async def test_reindex_rejects_non_eyeai_host(ctx):
 async def test_reindex_runs_and_returns_counts(ctx):
     register_maintenance_tools(ctx)
     with patch(
-        "eyeai_deriva_mcp_plugin.maintenance._index_catalog",
+        "eye_ai_deriva_mcp_plugin.maintenance._index_catalog",
         AsyncMock(return_value={"tables_indexed": 2, "tables_failed": 0, "rows_indexed": 7}),
     ):
         out = json.loads(
-            await ctx._mcp.tools["deriva_eyeai_reindex_catalog"]("www.eye-ai.org", "5")
+            await ctx._mcp.tools["deriva_eye_ai_reindex_catalog"]("www.eye-ai.org", "5")
         )
     assert out["status"] == "reindexed"
     assert out["host"] == "www.eye-ai.org"
@@ -1175,11 +1175,11 @@ async def test_reindex_runs_and_returns_counts(ctx):
 async def test_reindex_error_envelope_on_failure(ctx):
     register_maintenance_tools(ctx)
     with patch(
-        "eyeai_deriva_mcp_plugin.maintenance._index_catalog",
+        "eye_ai_deriva_mcp_plugin.maintenance._index_catalog",
         AsyncMock(side_effect=RuntimeError("store down")),
     ):
         out = json.loads(
-            await ctx._mcp.tools["deriva_eyeai_reindex_catalog"]("www.eye-ai.org", "5")
+            await ctx._mcp.tools["deriva_eye_ai_reindex_catalog"]("www.eye-ai.org", "5")
         )
     assert out == {"error": "store down"}
 ```
@@ -1187,14 +1187,14 @@ async def test_reindex_error_envelope_on_failure(ctx):
 - [ ] **Step 2: Run to verify it fails**
 
 Run: `uv run pytest tests/test_maintenance.py -v`
-Expected: FAIL — `ModuleNotFoundError: eyeai_deriva_mcp_plugin.maintenance`.
+Expected: FAIL — `ModuleNotFoundError: eye_ai_deriva_mcp_plugin.maintenance`.
 
-- [ ] **Step 3: Write `src/eyeai_deriva_mcp_plugin/maintenance.py`**
+- [ ] **Step 3: Write `src/eye_ai_deriva_mcp_plugin/maintenance.py`**
 
 ```python
 """Manual re-index maintenance tool.
 
-``deriva_eyeai_reindex_catalog`` forces a full re-index of an eye-ai
+``deriva_eye_ai_reindex_catalog`` forces a full re-index of an eye-ai
 catalog's configured tables, bypassing the on-connect TTL gate. Use it
 when data changed out of band (e.g. via Chaise) and the TTL has not
 expired. ``mutates=False`` -- it writes the vector store, not the
@@ -1205,8 +1205,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from eyeai_deriva_mcp_plugin import config
-from eyeai_deriva_mcp_plugin.indexing import _index_catalog
+from eye_ai_deriva_mcp_plugin import config
+from eye_ai_deriva_mcp_plugin.indexing import _index_catalog
 
 if TYPE_CHECKING:
     from deriva_mcp_core.plugin.api import PluginContext
@@ -1226,11 +1226,11 @@ def register_maintenance_tools(ctx: PluginContext) -> None:
         >>> # ctx provided by the framework
         >>> register_maintenance_tools(ctx)  # doctest: +SKIP
     """
-    hosts = config.eyeai_hosts(ctx.env)
-    tables = config.eyeai_tables(ctx.env)
+    hosts = config.eye_ai_hosts(ctx.env)
+    tables = config.eye_ai_tables(ctx.env)
 
     @ctx.tool(mutates=False)
-    async def deriva_eyeai_reindex_catalog(hostname: str, catalog_id: str) -> str:
+    async def deriva_eye_ai_reindex_catalog(hostname: str, catalog_id: str) -> str:
         """Force a full re-index of an eye-ai catalog's configured tables.
 
         Bypasses the on-connect TTL gate. Host-gated: returns an error
@@ -1278,8 +1278,8 @@ Expected: PASS — 4 tests.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add tests/test_maintenance.py src/eyeai_deriva_mcp_plugin/maintenance.py
-git commit -m "feat(maintenance): deriva_eyeai_reindex_catalog tool"
+git add tests/test_maintenance.py src/eye_ai_deriva_mcp_plugin/maintenance.py
+git commit -m "feat(maintenance): deriva_eye_ai_reindex_catalog tool"
 ```
 
 ---
@@ -1287,7 +1287,7 @@ git commit -m "feat(maintenance): deriva_eyeai_reindex_catalog tool"
 ## Task 8: The register entry point
 
 **Files:**
-- Create: `src/eyeai_deriva_mcp_plugin/plugin.py`
+- Create: `src/eye_ai_deriva_mcp_plugin/plugin.py`
 - Test: `tests/test_plugin.py`
 
 - [ ] **Step 1: Write the failing test `tests/test_plugin.py`**
@@ -1299,30 +1299,30 @@ from __future__ import annotations
 
 from importlib import metadata
 
-from eyeai_deriva_mcp_plugin.plugin import register
+from eye_ai_deriva_mcp_plugin.plugin import register
 
 
 def test_register_runs_without_error(ctx):
     register(ctx)
     # The maintenance tool landed.
-    assert "deriva_eyeai_reindex_catalog" in ctx._mcp.tools
+    assert "deriva_eye_ai_reindex_catalog" in ctx._mcp.tools
     # One catalog-connect hook registered.
     assert len(ctx._catalog_connect_hooks) == 1
 
 
 def test_entry_point_resolves_to_register():
     eps = metadata.entry_points(group="deriva_mcp.plugins")
-    matching = [ep for ep in eps if ep.name == "eyeai-deriva-mcp-plugin"]
-    assert matching, "entry point 'eyeai-deriva-mcp-plugin' not declared"
+    matching = [ep for ep in eps if ep.name == "eye-ai-deriva-mcp-plugin"]
+    assert matching, "entry point 'eye-ai-deriva-mcp-plugin' not declared"
     assert matching[0].load() is register
 ```
 
 - [ ] **Step 2: Run to verify it fails**
 
 Run: `uv run pytest tests/test_plugin.py -v`
-Expected: FAIL — `ModuleNotFoundError: eyeai_deriva_mcp_plugin.plugin`.
+Expected: FAIL — `ModuleNotFoundError: eye_ai_deriva_mcp_plugin.plugin`.
 
-- [ ] **Step 3: Write `src/eyeai_deriva_mcp_plugin/plugin.py`**
+- [ ] **Step 3: Write `src/eye_ai_deriva_mcp_plugin/plugin.py`**
 
 ```python
 """Plugin entry point: register the eye-ai indexer + maintenance tool.
@@ -1332,7 +1332,7 @@ plugin loader (subject to ``DERIVA_MCP_PLUGIN_ALLOWLIST``). It wires:
 
 1. The ``on_catalog_connect`` hook that indexes eye-ai catalogs on
    connect (host/RAG/TTL gated; background task).
-2. The ``deriva_eyeai_reindex_catalog`` maintenance tool.
+2. The ``deriva_eye_ai_reindex_catalog`` maintenance tool.
 
 No domain query tools and no prompts in v0.1 -- generic catalog tools
 come from core and DerivaML tools from the deriva-ml-mcp sibling plugin.
@@ -1342,8 +1342,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from eyeai_deriva_mcp_plugin.indexing import make_catalog_connect_hook
-from eyeai_deriva_mcp_plugin.maintenance import register_maintenance_tools
+from eye_ai_deriva_mcp_plugin.indexing import make_catalog_connect_hook
+from eye_ai_deriva_mcp_plugin.maintenance import register_maintenance_tools
 
 if TYPE_CHECKING:
     from deriva_mcp_core.plugin.api import PluginContext
@@ -1380,7 +1380,7 @@ Expected: All tests PASS; ruff "All checks passed!".
 - [ ] **Step 6: Commit**
 
 ```bash
-git add tests/test_plugin.py src/eyeai_deriva_mcp_plugin/plugin.py
+git add tests/test_plugin.py src/eye_ai_deriva_mcp_plugin/plugin.py
 git commit -m "feat(plugin): register entry point wiring hook + maintenance tool"
 ```
 
@@ -1394,7 +1394,7 @@ git commit -m "feat(plugin): register entry point wiring hook + maintenance tool
 - [ ] **Step 1: Write `README.md`**
 
 ````markdown
-# eyeai-deriva-mcp-plugin
+# eye-ai-deriva-mcp-plugin
 
 Eye-AI domain RAG-indexing plugin for [deriva-mcp-core](https://github.com/informatics-isi-edu/deriva-mcp-core).
 
@@ -1414,21 +1414,21 @@ Pre-alpha. Versioned `v0.x.y`.
   tool connects to a configured eye-ai host. It submits a background
   task that fetches each configured `EyeAI:<table>`, serializes rows to
   Markdown, and writes them to the vector store under catalog-public
-  `eyeai:{host}:{cat}:{schema}.{table}` source names. The catalog has
+  `eye-ai:{host}:{cat}:{schema}.{table}` source names. The catalog has
   auth-gating but **no row-level ACLs**, so a single shared index is
   correct.
 - **TTL-gated.** Re-indexing on reconnect is skipped within a
   configurable window (default 24h).
-- **Manual reindex.** `deriva_eyeai_reindex_catalog(hostname,
+- **Manual reindex.** `deriva_eye_ai_reindex_catalog(hostname,
   catalog_id)` forces a full re-index (bypasses the TTL).
 
 ## Configuration
 
 | Env var | Default | Meaning |
 |---|---|---|
-| `EYEAI_DERIVA_MCP_HOSTS` | `www.eye-ai.org,dev.eye-ai.org` | Hosts that trigger indexing |
-| `EYEAI_DERIVA_MCP_TABLES` | placeholder `EyeAI:Subject,...` | `schema:table` list to index |
-| `EYEAI_DERIVA_MCP_INDEX_TTL_SECONDS` | `86400` | Re-index TTL |
+| `EYE_AI_DERIVA_MCP_HOSTS` | `www.eye-ai.org,dev.eye-ai.org` | Hosts that trigger indexing |
+| `EYE_AI_DERIVA_MCP_TABLES` | placeholder `EyeAI:Subject,...` | `schema:table` list to index |
+| `EYE_AI_DERIVA_MCP_INDEX_TTL_SECONDS` | `86400` | Re-index TTL |
 | `DERIVA_MCP_RAG_ENABLED` | `false` | Must be `true` for any indexing |
 
 ## Deployment (deriva-docker)
@@ -1436,10 +1436,10 @@ Pre-alpha. Versioned `v0.x.y`.
 Add to `DERIVA_MCP_EXTRA_PACKAGES` (alongside deriva-ml-mcp + deriva-ml + the deriva-py `deriva-ml` branch):
 
 ```bash
-DERIVA_MCP_EXTRA_PACKAGES="eyeai-deriva-mcp-plugin@git+https://github.com/informatics-isi-edu/eyeai-deriva-mcp-plugin.git@main deriva-ml-mcp@git+https://github.com/informatics-isi-edu/deriva-ml-mcp.git@main deriva-ml@git+https://github.com/informatics-isi-edu/deriva-ml.git@main deriva@git+https://github.com/informatics-isi-edu/deriva-py@deriva-ml"
+DERIVA_MCP_EXTRA_PACKAGES="eye-ai-deriva-mcp-plugin@git+https://github.com/informatics-isi-edu/eye-ai-deriva-mcp-plugin.git@main deriva-ml-mcp@git+https://github.com/informatics-isi-edu/deriva-ml-mcp.git@main deriva-ml@git+https://github.com/informatics-isi-edu/deriva-ml.git@main deriva@git+https://github.com/informatics-isi-edu/deriva-py@deriva-ml"
 ```
 
-Add `eyeai-deriva-mcp-plugin` to `DERIVA_MCP_PLUGIN_ALLOWLIST` in `mcp/config/deriva-mcp.env`, then rebuild `--no-cache` + restart. The `scripts/rebuild-deriva-docker-mcp.sh` helper wraps the three commands.
+Add `eye-ai-deriva-mcp-plugin` to `DERIVA_MCP_PLUGIN_ALLOWLIST` in `mcp/config/deriva-mcp.env`, then rebuild `--no-cache` + restart. The `scripts/rebuild-deriva-docker-mcp.sh` helper wraps the three commands.
 
 ## Development
 
@@ -1460,7 +1460,7 @@ Apache-2.0.
 ```markdown
 # CLAUDE.md
 
-Guidance for Claude Code when working with `eyeai-deriva-mcp-plugin`.
+Guidance for Claude Code when working with `eye-ai-deriva-mcp-plugin`.
 
 ## Project Overview
 
@@ -1473,19 +1473,19 @@ plugin. The deployable MCP server is `deriva-mcp-core` + this plugin +
 ## Architecture
 
 ```
-src/eyeai_deriva_mcp_plugin/
+src/eye_ai_deriva_mcp_plugin/
 ├── plugin.py        # register(ctx): wires the hook + maintenance tool
 ├── config.py        # host set / table list / TTL (env-overridable)
 ├── serializers.py   # EyeAIRowSerializer: row -> Markdown
 ├── indexing.py      # on_catalog_connect hook + background index task
-└── maintenance.py   # deriva_eyeai_reindex_catalog tool
+└── maintenance.py   # deriva_eye_ai_reindex_catalog tool
 ```
 
 ## Key design decisions
 
 - **Catalog-public index.** Eye-ai has auth-gating but no row-level
-  ACLs, so a single shared index (`eyeai:` source prefix) is correct.
-  The `eyeai:` prefix bypasses upstream's per-user `data:` filter
+  ACLs, so a single shared index (`eye-ai:` source prefix) is correct.
+  The `eye-ai:` prefix bypasses upstream's per-user `data:` filter
   (same trick as deriva-ml-mcp's `vocab:` prefix), serving chunks to
   all authorized users.
 - **Background indexing.** The hook submits a `ctx.submit_task` so the
@@ -1493,7 +1493,7 @@ src/eyeai_deriva_mcp_plugin/
   the credential from the TaskManager (background tasks lack the
   request contextvar credential).
 - **TTL-gated.** `_is_index_fresh` reads `store.source_stats()`
-  `indexed_at` timestamps for the catalog's `eyeai:` sources.
+  `indexed_at` timestamps for the catalog's `eye-ai:` sources.
 
 ## Conventions (shared workspace rules)
 
@@ -1502,7 +1502,7 @@ src/eyeai_deriva_mcp_plugin/
 - **Google-style docstrings** with `Args:`/`Returns:`/`Raises:`/
   `Example:`.
 - **No backwards-compat shims; no over-engineering.**
-- **Entry-point name == package name** (`eyeai-deriva-mcp-plugin`) so
+- **Entry-point name == package name** (`eye-ai-deriva-mcp-plugin`) so
   the deriva-docker `DERIVA_MCP_PLUGIN_ALLOWLIST` value works without
   the name-vs-package confusion that bit deriva-ml-mcp early on.
 
@@ -1531,7 +1531,7 @@ no git introspection.
 `DERIVA_MCP_EXTRA_PACKAGES` must include this plugin + deriva-ml-mcp +
 deriva-ml + the deriva-py `deriva-ml` branch (pip inside the container
 does not honor `[tool.uv] override-dependencies`). Add
-`eyeai-deriva-mcp-plugin` to `DERIVA_MCP_PLUGIN_ALLOWLIST`. Rebuild
+`eye-ai-deriva-mcp-plugin` to `DERIVA_MCP_PLUGIN_ALLOWLIST`. Rebuild
 `--no-cache` (else pip reuses the cached wheel layer):
 
 ```bash
@@ -1549,7 +1549,7 @@ tree must be clean before bumping.
 
 ## Development gotchas
 
-- `src/eyeai_deriva_mcp_plugin/_version.py` is auto-generated by
+- `src/eye_ai_deriva_mcp_plugin/_version.py` is auto-generated by
   hatch-vcs, gitignored, and ruff-excluded. Don't commit or format it.
 - House style is `from __future__ import annotations`; leave
   annotations unquoted.
@@ -1618,7 +1618,7 @@ Expected: all tests PASS; ruff lint + format clean. (If format flags files, run 
 - [ ] **Step 2: Create the GitHub repo and push**
 
 ```bash
-gh repo create informatics-isi-edu/eyeai-deriva-mcp-plugin --private --source=. --remote=origin --description "Eye-AI domain RAG indexing plugin for deriva-mcp-core"
+gh repo create informatics-isi-edu/eye-ai-deriva-mcp-plugin --private --source=. --remote=origin --description "Eye-AI domain RAG indexing plugin for deriva-mcp-core"
 git push -u origin main
 ```
 
@@ -1636,8 +1636,8 @@ git push origin v0.1.0
 
 ## Self-review notes
 
-- **Spec coverage:** host-gate (Task 6), table list (Task 2), catalog-public `eyeai:` source (Task 4), TTL gate (Task 5), background task (Task 6), serializer (Task 3), maintenance tool (Task 7), entry-point-name==package-name (Task 1), CLAUDE.md stateless rule (Task 9), deriva-docker deployment (Task 9). All spec sections map to a task.
-- **Deferred item:** the real `EYEAI_TABLES` list — implemented as a placeholder constant + env override (Task 2), correctable in one line per the user's direction.
+- **Spec coverage:** host-gate (Task 6), table list (Task 2), catalog-public `eye-ai:` source (Task 4), TTL gate (Task 5), background task (Task 6), serializer (Task 3), maintenance tool (Task 7), entry-point-name==package-name (Task 1), CLAUDE.md stateless rule (Task 9), deriva-docker deployment (Task 9). All spec sections map to a task.
+- **Deferred item:** the real `EYE_AI_TABLES` list — implemented as a placeholder constant + env override (Task 2), correctable in one line per the user's direction.
 - **Dropped from spec:** GitHub doc RAG source (design review), per-user ACL split (no eye-ai ACLs), domain tools (v0.1 non-goal), prompts (v0.1 non-goal). None appear in tasks — correct.
 - **Type consistency:** `_index_catalog` returns `{"tables_indexed","tables_failed","rows_indexed"}` in Tasks 5/6/7; the maintenance tool spreads it (Task 7); `_source_name`/`_write_table`/`_fetch_table_rows` signatures match across Tasks 4-7.
 - **Open verification risk:** `chunk_markdown`'s yielded object field names (`.text`, `.section_heading`, `.heading_hierarchy`) are assumed from the deriva-ml-mcp `_write_row_chunk` usage. Task 4 Step 4 (running the test) verifies them against the real API; if a name differs, fix in the `_write_table` loop and re-run.
