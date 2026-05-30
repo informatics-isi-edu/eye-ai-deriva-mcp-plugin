@@ -19,10 +19,13 @@ on-connect hook are added in later modules/tasks.
 
 from __future__ import annotations
 
+import asyncio
 import logging
+from datetime import UTC, datetime
 from typing import Any
 
 from deriva_mcp_core import deriva_call, get_catalog
+from deriva_mcp_core.rag import get_rag_store
 from deriva_mcp_core.rag.chunker import chunk_markdown
 from deriva_mcp_core.rag.store import Chunk
 
@@ -118,3 +121,105 @@ async def _write_table(
     if chunks:
         await store.add(chunks)
     return len(chunks)
+
+
+def _parse_iso(ts: str) -> datetime | None:
+    """Parse an ISO-8601 timestamp; return None on any failure."""
+    try:
+        dt = datetime.fromisoformat(ts)
+    except (ValueError, TypeError):
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=UTC)
+    return dt
+
+
+async def _is_index_fresh(
+    store: Any, hostname: str, catalog_id: str, ttl_seconds: int
+) -> bool:
+    """Return True if this catalog's eye-ai index is within the TTL.
+
+    Reads the most recent ``indexed_at`` across the catalog's
+    ``eye-ai:{host}:{cat}:`` sources from ``store.source_stats()``. If
+    none exist (never indexed) or the freshest is older than the TTL,
+    returns False.
+
+    Args:
+        store: An active vector store.
+        hostname: Deriva server hostname.
+        catalog_id: Catalog ID as a string.
+        ttl_seconds: Freshness window.
+
+    Returns:
+        True if a re-index can be skipped; False otherwise.
+    """
+    if ttl_seconds <= 0:
+        return False
+    prefix = f"eye-ai:{hostname}:{catalog_id}:"
+    stats = await store.source_stats()
+    newest: datetime | None = None
+    for source, stat in stats.items():
+        if not source.startswith(prefix) or stat.indexed_at is None:
+            continue
+        dt = _parse_iso(stat.indexed_at)
+        if dt is not None and (newest is None or dt > newest):
+            newest = dt
+    if newest is None:
+        return False
+    age = (datetime.now(UTC) - newest).total_seconds()
+    return age < ttl_seconds
+
+
+async def _index_catalog(
+    hostname: str,
+    catalog_id: str,
+    tables: list[tuple[str, str]],
+    env: dict[str, str],  # noqa: ARG001 -- reserved for future per-call config
+) -> dict[str, int]:
+    """Fetch + index every configured eye-ai table for one catalog.
+
+    Per-table fetch failures are isolated: a failing table is logged and
+    counted in ``tables_failed`` but does not abort the rest of the
+    pass. Runs the synchronous ERMrest fetch in a worker thread.
+
+    Args:
+        hostname: Deriva server hostname.
+        catalog_id: Catalog ID as a string.
+        tables: Ordered ``(schema, table)`` pairs to index.
+        env: Reserved (merged env map) for future per-call knobs.
+
+    Returns:
+        ``{"tables_indexed", "tables_failed", "rows_indexed"}``.
+    """
+    store = get_rag_store()
+    if store is None:
+        logger.debug("eye-ai RAG: store unavailable, skipping index of %s/%s", hostname, catalog_id)
+        return {"tables_indexed": 0, "tables_failed": 0, "rows_indexed": 0}
+
+    tables_indexed = 0
+    tables_failed = 0
+    rows_indexed = 0
+    for schema, table in tables:
+        source = _source_name(hostname, catalog_id, schema, table)
+        try:
+            rows = await asyncio.to_thread(
+                _fetch_table_rows, hostname, catalog_id, schema, table
+            )
+        except Exception:  # noqa: BLE001 -- one bad table must not abort the pass
+            logger.exception(
+                "eye-ai RAG: fetch failed for %s:%s on %s/%s", schema, table, hostname, catalog_id
+            )
+            tables_failed += 1
+            continue
+        await _write_table(store, source, table, rows)
+        tables_indexed += 1
+        rows_indexed += len(rows)
+    logger.info(
+        "eye-ai RAG: indexed %s/%s -- %d tables, %d failed, %d rows",
+        hostname, catalog_id, tables_indexed, tables_failed, rows_indexed,
+    )
+    return {
+        "tables_indexed": tables_indexed,
+        "tables_failed": tables_failed,
+        "rows_indexed": rows_indexed,
+    }

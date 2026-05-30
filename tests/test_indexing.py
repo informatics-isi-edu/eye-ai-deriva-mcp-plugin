@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from eye_ai_deriva_mcp_plugin import indexing
@@ -46,3 +47,75 @@ async def test_write_table_empty_rows_skips_add():
     store.delete_source.assert_awaited_once_with("src1")
     store.add.assert_not_awaited()
     assert written == 0
+
+
+async def test_is_index_fresh_true_within_ttl():
+    from deriva_mcp_core.rag.store import SourceStats
+
+    now_iso = datetime.now(UTC).isoformat()
+    store = MagicMock()
+    store.source_stats = AsyncMock(
+        return_value={"eye-ai:www.eye-ai.org:5:EyeAI.Subject": SourceStats(3, now_iso)}
+    )
+    fresh = await indexing._is_index_fresh(store, "www.eye-ai.org", "5", ttl_seconds=86400)
+    assert fresh is True
+
+
+async def test_is_index_fresh_false_when_stale():
+    from deriva_mcp_core.rag.store import SourceStats
+
+    old_iso = "2000-01-01T00:00:00+00:00"
+    store = MagicMock()
+    store.source_stats = AsyncMock(
+        return_value={"eye-ai:www.eye-ai.org:5:EyeAI.Subject": SourceStats(3, old_iso)}
+    )
+    fresh = await indexing._is_index_fresh(store, "www.eye-ai.org", "5", ttl_seconds=86400)
+    assert fresh is False
+
+
+async def test_is_index_fresh_false_when_no_sources():
+    store = MagicMock()
+    store.source_stats = AsyncMock(return_value={})
+    fresh = await indexing._is_index_fresh(store, "www.eye-ai.org", "5", ttl_seconds=86400)
+    assert fresh is False
+
+
+async def test_index_catalog_indexes_each_configured_table():
+    store = MagicMock()
+    store.delete_source = AsyncMock()
+    store.add = AsyncMock()
+    with (
+        patch("eye_ai_deriva_mcp_plugin.indexing.get_rag_store", return_value=store),
+        patch(
+            "eye_ai_deriva_mcp_plugin.indexing._fetch_table_rows",
+            return_value=[{"RID": "1-AAAA", "Name": "S1"}],
+        ),
+    ):
+        result = await indexing._index_catalog(
+            "www.eye-ai.org", "5", [("EyeAI", "Subject"), ("EyeAI", "Image")], {}
+        )
+    assert result["tables_indexed"] == 2
+    assert result["rows_indexed"] == 2
+    assert store.delete_source.await_count == 2
+    assert store.add.await_count == 2
+
+
+async def test_index_catalog_isolates_table_fetch_failure():
+    store = MagicMock()
+    store.delete_source = AsyncMock()
+    store.add = AsyncMock()
+
+    def _fetch(host, cat, schema, table):
+        if table == "Image":
+            raise RuntimeError("ermrest 500")
+        return [{"RID": "1-AAAA"}]
+
+    with (
+        patch("eye_ai_deriva_mcp_plugin.indexing.get_rag_store", return_value=store),
+        patch("eye_ai_deriva_mcp_plugin.indexing._fetch_table_rows", side_effect=_fetch),
+    ):
+        result = await indexing._index_catalog(
+            "www.eye-ai.org", "5", [("EyeAI", "Subject"), ("EyeAI", "Image")], {}
+        )
+    assert result["tables_indexed"] == 1
+    assert result["tables_failed"] == 1
