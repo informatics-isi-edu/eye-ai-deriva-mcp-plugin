@@ -36,7 +36,12 @@ dev = [
 system-certs = ["pip-system-certs>=5.3"]
 
 [project.entry-points."deriva_mcp.plugins"]
-eye-ai-deriva-mcp-plugin = "eye_ai_deriva_mcp_plugin.plugin:register"
+# Entry-point name is the bare domain ("eye-ai"), matching the
+# facebase-deriva-mcp-plugin convention (entry point "facebase"). This is the
+# *plugin* token the deriva-docker DERIVA_MCP_PLUGIN_ALLOWLIST references —
+# distinct from the distribution name (eye-ai-deriva-mcp-plugin) and the import
+# package (eye_ai_deriva_mcp_plugin).
+eye-ai = "eye_ai_deriva_mcp_plugin.plugin:register"
 
 [tool.hatch.metadata]
 allow-direct-references = true

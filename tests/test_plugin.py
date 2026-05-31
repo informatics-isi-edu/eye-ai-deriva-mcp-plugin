@@ -16,7 +16,9 @@ def test_register_runs_without_error(ctx):
 
 
 def test_entry_point_resolves_to_register():
+    # Entry-point name is the bare domain ("eye-ai"), matching the
+    # facebase-deriva-mcp-plugin convention (entry point "facebase").
     eps = metadata.entry_points(group="deriva_mcp.plugins")
-    matching = [ep for ep in eps if ep.name == "eye-ai-deriva-mcp-plugin"]
-    assert matching, "entry point 'eye-ai-deriva-mcp-plugin' not declared"
+    matching = [ep for ep in eps if ep.name == "eye-ai"]
+    assert matching, "entry point 'eye-ai' not declared"
     assert matching[0].load() is register
