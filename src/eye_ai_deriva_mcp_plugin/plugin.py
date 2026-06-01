@@ -8,7 +8,11 @@ plugin loader (subject to ``DERIVA_MCP_PLUGIN_ALLOWLIST``). It wires:
    them to the catalog-public ``enriched:`` RAG source. ``is_public=True``
    is correct because the eye-ai catalog has auth-gating but no row-level
    ACLs -- every authorized user sees the same rows.
-2. Three eye-ai domain MCP prompts (``eye-ai-assistant``,
+2. One ``ctx.rag_github_source`` for the eye-ai-rag-docs repo, whose
+   ``markdown/`` directory holds section-aware Markdown of the project's
+   research papers. The framework crawls it (public repo, ``.md`` only)
+   and chunks each file by its section headings.
+3. Three eye-ai domain MCP prompts (``eye-ai-assistant``,
    ``find-images``, ``explore-diagnosis``).
 
 The framework owns fetching, chunking, TTL-gating, credential handling,
@@ -36,15 +40,29 @@ if TYPE_CHECKING:
 
 _DOC_TYPE = "eye-ai-data"
 
+# The eye-ai-rag-docs GitHub source: section-aware Markdown of the
+# project's research papers, under the repo's ``markdown/`` prefix. The
+# framework's GitHub crawler indexes ``.md`` files only, so the PDFs that
+# sit alongside in that repo are ignored; the Markdown is what gets
+# chunked (by its ## / ### section headings) and searched.
+_PAPERS_RAG_SOURCE = {
+    "name": "eye-ai-rag-docs",
+    "repo_owner": "eye-ai-usc",
+    "repo_name": "eye-ai-rag-docs",
+    "branch": "main",
+    "path_prefix": "markdown/",
+    "doc_type": "eye-ai-paper",
+}
+
 
 def register(ctx: PluginContext) -> None:
-    """Register the eye-ai RAG indexers and domain prompts with ``ctx``.
+    """Register the eye-ai RAG indexers, papers source, and domain prompts.
 
     Declares one ``rag_dataset_indexer`` per (host, schema, table) in the
-    configured set, then registers the eye-ai domain prompts. All
-    registrations are no-ops when RAG is disabled
-    (``DERIVA_MCP_RAG_ENABLED=false``) except the prompts, which always
-    register.
+    configured set, the eye-ai-rag-docs papers ``rag_github_source``, then
+    registers the eye-ai domain prompts. All RAG registrations are no-ops
+    when RAG is disabled (``DERIVA_MCP_RAG_ENABLED=false``); the prompts
+    always register.
 
     Args:
         ctx: PluginContext supplied by deriva-mcp-core at startup.
@@ -73,5 +91,7 @@ def register(ctx: PluginContext) -> None:
                 auto_enrich=True,
                 is_public=True,
             )
+
+    ctx.rag_github_source(**_PAPERS_RAG_SOURCE)
 
     prompts.register(ctx)
