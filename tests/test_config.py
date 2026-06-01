@@ -16,17 +16,16 @@ def test_hosts_env_override():
 
 def test_default_tables():
     assert config.eye_ai_tables({}) == [
-        ("EyeAI", "Subject"),
-        ("EyeAI", "Image"),
-        ("EyeAI", "Observation"),
-        ("EyeAI", "Diagnosis"),
-        ("EyeAI", "Condition_Label"),
+        ("eye-ai", "Subject"),
+        ("eye-ai", "Image"),
+        ("eye-ai", "Observation"),
+        ("eye-ai", "Condition_Label"),
     ]
 
 
 def test_tables_env_override():
-    env = {"EYE_AI_DERIVA_MCP_TABLES": "EyeAI:Subject, EyeAI:Image"}
-    assert config.eye_ai_tables(env) == [("EyeAI", "Subject"), ("EyeAI", "Image")]
+    env = {"EYE_AI_DERIVA_MCP_TABLES": "eye-ai:Subject, eye-ai:Image"}
+    assert config.eye_ai_tables(env) == [("eye-ai", "Subject"), ("eye-ai", "Image")]
 
 
 def test_default_ttl():
