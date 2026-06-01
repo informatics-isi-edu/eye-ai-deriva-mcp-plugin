@@ -11,15 +11,18 @@ from __future__ import annotations
 
 _DEFAULT_HOSTS = ("www.eye-ai.org", "dev.eye-ai.org")
 
-# Placeholder table list -- the real curated set is supplied by the
-# project owner later and swapped in here (or via the env override).
-# Each entry is a (schema, table) pair in ERMrest case.
+# Starter table list -- the real curated set is supplied by the project
+# owner later and swapped in here (or via the env override). Each entry
+# is a (schema, table) pair in ERMrest case. The domain schema is
+# ``eye-ai`` (lowercase, hyphenated); the four tables below all exist on
+# the live catalog. The sibling deriva-ml-mcp-plugin already indexes all
+# vocabularies (including Condition_Label) and the deriva-ml datasets, so
+# this plugin's unique contribution is the clinical domain rows.
 _DEFAULT_TABLES = (
-    ("EyeAI", "Subject"),
-    ("EyeAI", "Image"),
-    ("EyeAI", "Observation"),
-    ("EyeAI", "Diagnosis"),
-    ("EyeAI", "Condition_Label"),
+    ("eye-ai", "Subject"),
+    ("eye-ai", "Image"),
+    ("eye-ai", "Observation"),
+    ("eye-ai", "Condition_Label"),
 )
 
 _DEFAULT_TTL_SECONDS = 86400  # 24h
@@ -60,8 +63,8 @@ def eye_ai_tables(env: dict[str, str]) -> list[tuple[str, str]]:
         Ordered list of ``(schema, table)`` tuples.
 
     Example:
-        >>> eye_ai_tables({"EYE_AI_DERIVA_MCP_TABLES": "EyeAI:Subject"})
-        [('EyeAI', 'Subject')]
+        >>> eye_ai_tables({"EYE_AI_DERIVA_MCP_TABLES": "eye-ai:Subject"})
+        [('eye-ai', 'Subject')]
     """
     raw = env.get("EYE_AI_DERIVA_MCP_TABLES")
     if not raw:

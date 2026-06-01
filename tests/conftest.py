@@ -9,10 +9,11 @@ from deriva_mcp_core.plugin.api import PluginContext, _set_plugin_context
 
 
 class _CapturingMCP:
-    """Minimal FastMCP stand-in that stores registered tools by name."""
+    """Minimal FastMCP stand-in that stores registered tools and prompts by name."""
 
     def __init__(self) -> None:
         self.tools: dict[str, Any] = {}
+        self.prompts: dict[str, Any] = {}
 
     def tool(self, **kwargs: Any):
         def decorator(fn):
@@ -25,7 +26,15 @@ class _CapturingMCP:
         return lambda fn: fn
 
     def prompt(self, *a: Any, **kw: Any):
-        return lambda fn: fn
+        # ctx.prompt(name, ...) forwards (name, *args) here; the prompt
+        # name is the first positional arg (or the ``name`` kwarg).
+        name = a[0] if a else kw.get("name")
+
+        def decorator(fn):
+            self.prompts[name] = fn
+            return fn
+
+        return decorator
 
 
 @pytest.fixture()

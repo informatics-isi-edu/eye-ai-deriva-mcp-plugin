@@ -4,38 +4,59 @@ Guidance for Claude Code when working with `eye-ai-deriva-mcp-plugin`.
 
 ## Project Overview
 
-A `deriva-mcp-core` plugin that RAG-indexes eye-ai catalog domain
-tables on connect. No domain query tools (v0.1) — generic catalog tools
-come from core, DerivaML tools from the co-located `deriva-ml-mcp`
-plugin. The deployable MCP server is `deriva-mcp-core` + this plugin +
-`deriva-ml-mcp`.
+A `deriva-mcp-core` plugin that RAG-indexes eye-ai catalog clinical
+domain tables and ships eye-ai domain prompts. No domain query tools —
+generic catalog tools come from core, DerivaML tools from the
+co-located `deriva-ml-mcp` plugin. The deployable MCP server is
+`deriva-mcp-core` + this plugin + `deriva-ml-mcp`.
+
+The indexing mechanism is **declarative**, matching
+`facebase-deriva-mcp-plugin`: `register()` calls
+`ctx.rag_dataset_indexer(...)` per (host, table), and the framework owns
+fetching, chunking, TTL-gating, credential handling, source naming, and
+the on-connect/background execution. The plugin only supplies *what* to
+index (the table list) and *how to render* a row (the enricher).
 
 ## Architecture
 
 ```
 src/eye_ai_deriva_mcp_plugin/
-├── plugin.py        # register(ctx): wires the hook + maintenance tool
-├── config.py        # host set / table list / TTL (env-overridable)
-├── serializers.py   # EyeAIRowSerializer: row -> Markdown
-├── indexing.py      # on_catalog_connect hook + background index task
-└── maintenance.py   # deriva_eye_ai_reindex_catalog tool
+├── plugin.py     # register(ctx): rag_dataset_indexer loop + prompts.register
+├── config.py     # host set / table list / TTL (env-overridable)
+├── enricher.py   # make_enricher(table) -> async (row, catalog) -> Markdown
+└── prompts.py    # register(ctx): 3 eye-ai domain MCP prompts
 ```
 
 ## Key design decisions
 
-- **Catalog-public index.** Eye-ai has auth-gating but no row-level
-  ACLs, so a single shared index (`eye-ai:` source prefix) is correct.
-  The `eye-ai:` prefix bypasses upstream's per-user `data:` filter
-  (same trick as deriva-ml-mcp's `vocab:` prefix), serving chunks to
-  all authorized users.
-- **Background indexing requires HTTP transport.** The hook submits a
-  `ctx.submit_task` so the connect call returns immediately. The
-  background coroutine re-fetches the credential from the TaskManager
-  (`get_credential`), which is only available under HTTP transport. In
-  stdio mode the background index does not run.
-- **TTL-gated.** `_is_index_fresh` reads `store.source_stats()`
-  `indexed_at` timestamps for the catalog's `eye-ai:` sources; reconnect
-  within the TTL skips re-indexing.
+- **Catalog-public `enriched:` index.** Eye-ai has auth-gating but **no
+  row-level ACLs** (confirmed by the catalog owner) — every authorized
+  user sees the same rows. `ctx.rag_dataset_indexer(..., is_public=True)`
+  writes the catalog-public `enriched:` source prefix, which `rag_search`
+  serves to all users of the catalog. This is correct here and SAFE.
+  Note this is the **opposite** posture from the sibling
+  `deriva-ml-mcp`, whose ML data has per-user ACLs and therefore
+  deliberately avoids `rag_dataset_indexer` (it would leak rows across
+  users) in favor of a per-user hand-rolled hook. Eye-ai's clinical data
+  needs no such treatment. If eye-ai ever gains row-level ACLs, this
+  mechanism would leak and must switch to the per-user pattern.
+- **Don't duplicate the sibling.** The co-loaded `deriva-ml-mcp` already
+  RAG-indexes all vocabularies (any schema, via `find_vocabularies`) and
+  all deriva-ml Dataset/Workflow/Execution rows. So this plugin indexes
+  only the clinical domain rows (`Subject`, `Image`, `Observation`, and
+  `Condition_Label` — the last overlaps the sibling's vocab index, an
+  accepted minor redundancy) and ships the eye-ai *domain* prompts that
+  neither the sibling nor core provides.
+- **Flat enricher, no FK joins.** Eye-ai's categorical FKs reference the
+  vocabulary's `Name` column, so the fetched row already carries readable
+  labels — the flat row-to-Markdown render is sufficient, no resolve
+  fetches needed (unlike facebase's RID-referencing FKs). The enricher's
+  `catalog` arg is wired but unused, leaving room for cross-row
+  enrichment (Image→Observation→Subject; Diagnosis traversal) later.
+- **Auto-enrich + manual reindex.** Indexers declare `auto_enrich=True`;
+  on-connect execution is operator-gated by `DERIVA_MCP_RAG_AUTO_ENRICH`.
+  Manual re-indexing is the framework's `rag_ingest_datasets` tool —
+  this plugin ships no maintenance tool.
 
 ## Conventions (shared workspace rules)
 
@@ -44,31 +65,31 @@ src/eye_ai_deriva_mcp_plugin/
 - **Google-style docstrings** with `Args:`/`Returns:`/`Raises:`/
   `Example:`.
 - **No backwards-compat shims; no over-engineering.**
-- **Entry-point name == package name** (`eye-ai-deriva-mcp-plugin`) so
-  the deriva-docker `DERIVA_MCP_PLUGIN_ALLOWLIST` value works without
-  the name-vs-package confusion that bit deriva-ml-mcp early on.
+- **Entry-point name is the bare domain** (`eye-ai`) — distinct from the
+  distribution name (`eye-ai-deriva-mcp-plugin`) and the import package
+  (`eye_ai_deriva_mcp_plugin`). The deriva-docker
+  `DERIVA_MCP_PLUGIN_ALLOWLIST` value is the entry-point token `eye-ai`,
+  matching the `facebase-deriva-mcp-plugin` convention (entry point
+  `facebase`).
 
-## Tool / hook rules (from the deriva-mcp-core authoring guide)
+## Indexer / enricher rules (from the deriva-mcp-core authoring guide)
 
-- Every tool registers with explicit `mutates=`. The maintenance tool
-  is `mutates=False` (writes the vector store, not the catalog).
-- Wrap DERIVA I/O in `with deriva_call():`.
-- **Wrap every synchronous deriva-py call inside an `async def` in
-  `await asyncio.to_thread(...)`** — sync calls block the event loop
-  and can starve the host's permission stream.
-- Import context functions (`get_catalog`, etc.) at module level only
-  where a test patches that module attribute; otherwise inner imports
-  in the function body are fine. The maintenance tool's `_index_catalog`
-  is a module-level import so tests can patch
-  `eye_ai_deriva_mcp_plugin.maintenance._index_catalog`.
+- The plugin registers no tools and no `on_catalog_connect` hook — the
+  framework's `rag_dataset_indexer` owns the on-connect execution. If a
+  tool is ever added, it must register with explicit `mutates=`.
+- The enricher is `async (row, catalog) -> str`. It must not block: any
+  catalog I/O it adds later must be wrapped in `await
+  asyncio.to_thread(...)` (the framework calls it once per row, so a
+  blocking call would stall the event loop for the whole pass). The
+  current enricher does no I/O.
+- Returning `""` from the enricher skips the row (framework contract).
 
 ## Stateless / bounded-resource rule
 
-MCP tools must be stateless and bounded per call. The maintenance tool
-returns counts, not data. The indexing runs as a background task into
-the shared vector store (legitimate shared RAG infra, not per-user
-workspace state). No `~/.deriva-ml/` reads, no local-FS materialization,
-no git introspection.
+The indexing writes into the shared vector store (legitimate shared RAG
+infra, not per-user workspace state) via the framework. No `~/.deriva-ml/`
+reads, no local-FS materialization, no git introspection. The prompts are
+static strings — no catalog access to render.
 
 ## Running under Docker (deriva-docker)
 
