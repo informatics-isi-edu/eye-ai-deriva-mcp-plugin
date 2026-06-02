@@ -20,7 +20,7 @@ classifiers = [
 ]
 
 dependencies = [
-    "deriva-mcp-core",
+    "deriva-mcp-core>=0.1.0",
     "deriva-ml>=1.38.0",
     "deriva @ git+https://github.com/informatics-isi-edu/deriva-py@deriva-ml",
 ]
