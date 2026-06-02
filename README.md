@@ -51,15 +51,18 @@ Pre-alpha. Versioned `v0.x.y`.
 | Env var | Default | Meaning |
 |---|---|---|
 | `EYE_AI_DERIVA_MCP_HOSTS` | `www.eye-ai.org,dev.eye-ai.org` | Hosts each indexer is scoped to |
-| `EYE_AI_DERIVA_MCP_TABLES` | `eye-ai:Subject,eye-ai:Image,eye-ai:Observation,eye-ai:Condition_Label` | `schema:table` list to index |
+| `EYE_AI_DERIVA_MCP_TABLES` | _(empty)_ | `schema:table` list of clinical-row tables to index |
 | `EYE_AI_DERIVA_MCP_INDEX_TTL_SECONDS` | `86400` | Re-index TTL |
 | `DERIVA_MCP_RAG_ENABLED` | `false` | Must be `true` for any indexing |
 | `DERIVA_MCP_RAG_AUTO_ENRICH` | `false` | Must be `true` for automatic on-connect indexing |
 
-> The default `EYE_AI_DERIVA_MCP_TABLES` list is a verified starter set
-> (the four tables exist on the live catalog under the `eye-ai` schema).
-> The project owner's final curated set is swapped in later via the env
-> var or `config.py`.
+> Clinical-row indexing is **opt-in**: `EYE_AI_DERIVA_MCP_TABLES` is empty
+> by default, so out of the box the plugin registers no
+> `rag_dataset_indexer` (the papers `rag_github_source` and the domain
+> prompts still register). To turn it on, set the env var to a
+> comma-separated `schema:table` list of tables that exist on the live
+> catalog under the `eye-ai` schema, e.g.
+> `eye-ai:Subject,eye-ai:Image,eye-ai:Observation`.
 
 ## Deployment (deriva-docker)
 

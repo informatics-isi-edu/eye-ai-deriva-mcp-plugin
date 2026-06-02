@@ -11,19 +11,15 @@ from __future__ import annotations
 
 _DEFAULT_HOSTS = ("www.eye-ai.org", "dev.eye-ai.org")
 
-# Starter table list -- the real curated set is supplied by the project
-# owner later and swapped in here (or via the env override). Each entry
-# is a (schema, table) pair in ERMrest case. The domain schema is
-# ``eye-ai`` (lowercase, hyphenated); the four tables below all exist on
-# the live catalog. The sibling deriva-ml-mcp-plugin already indexes all
-# vocabularies (including Condition_Label) and the deriva-ml datasets, so
-# this plugin's unique contribution is the clinical domain rows.
-_DEFAULT_TABLES = (
-    ("eye-ai", "Subject"),
-    ("eye-ai", "Image"),
-    ("eye-ai", "Observation"),
-    ("eye-ai", "Condition_Label"),
-)
+# Clinical-row table list -- empty by default, opt-in via the
+# ``EYE_AI_DERIVA_MCP_TABLES`` env override. With no override, the plugin
+# registers no ``rag_dataset_indexer`` (no clinical-row indexing); the
+# papers ``rag_github_source`` and the domain prompts still register.
+# An operator sets the env var to a comma-separated ``schema:table`` list
+# (ERMrest case; domain schema is ``eye-ai``, lowercase/hyphenated) to
+# turn it on -- e.g. ``eye-ai:Subject,eye-ai:Image,eye-ai:Observation``.
+# Each entry is a (schema, table) pair.
+_DEFAULT_TABLES: tuple[tuple[str, str], ...] = ()
 
 _DEFAULT_TTL_SECONDS = 86400  # 24h
 

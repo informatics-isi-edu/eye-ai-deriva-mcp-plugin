@@ -8,12 +8,22 @@ from eye_ai_deriva_mcp_plugin import config
 from eye_ai_deriva_mcp_plugin.plugin import register
 
 
-def test_register_declares_one_indexer_per_host_table(ctx):
+def test_register_declares_no_indexers_by_default(ctx):
+    # Clinical-row indexing is opt-in (empty default table list), so a
+    # bare register() declares zero rag_dataset_indexers.
+    register(ctx)
+    assert ctx._rag_dataset_indexers == []
+
+
+def test_register_declares_one_indexer_per_host_table_when_configured(ctx):
+    # With the table env override set, register() declares one indexer per
+    # (host, schema, table) in the cross product.
+    ctx.env["EYE_AI_DERIVA_MCP_TABLES"] = "eye-ai:Subject,eye-ai:Image"
     register(ctx)
     hosts = config.eye_ai_hosts(ctx.env)
     tables = config.eye_ai_tables(ctx.env)
     indexers = ctx._rag_dataset_indexers
-    assert len(indexers) == len(hosts) * len(tables)
+    assert len(indexers) == len(hosts) * len(tables) == 4
     # Every indexer is the catalog-public, auto-enriched shape.
     assert all(ix.is_public for ix in indexers)
     assert all(ix.auto_enrich for ix in indexers)

@@ -14,13 +14,9 @@ def test_hosts_env_override():
     assert config.eye_ai_hosts(env) == {"a.eye-ai.org", "b.eye-ai.org"}
 
 
-def test_default_tables():
-    assert config.eye_ai_tables({}) == [
-        ("eye-ai", "Subject"),
-        ("eye-ai", "Image"),
-        ("eye-ai", "Observation"),
-        ("eye-ai", "Condition_Label"),
-    ]
+def test_default_tables_empty():
+    # Clinical-row indexing is opt-in: no tables by default.
+    assert config.eye_ai_tables({}) == []
 
 
 def test_tables_env_override():

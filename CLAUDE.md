@@ -42,11 +42,17 @@ src/eye_ai_deriva_mcp_plugin/
   mechanism would leak and must switch to the per-user pattern.
 - **Don't duplicate the sibling.** The co-loaded `deriva-ml-mcp` already
   RAG-indexes all vocabularies (any schema, via `find_vocabularies`) and
-  all deriva-ml Dataset/Workflow/Execution rows. So this plugin indexes
-  only the clinical domain rows (`Subject`, `Image`, `Observation`, and
-  `Condition_Label` — the last overlaps the sibling's vocab index, an
-  accepted minor redundancy) and ships the eye-ai *domain* prompts that
-  neither the sibling nor core provides.
+  all deriva-ml Dataset/Workflow/Execution rows. So this plugin's clinical
+  row indexing targets only domain rows like `Subject`, `Image`,
+  `Observation` (avoid `Condition_Label` and other vocab tables — the
+  sibling already covers those), and it ships the eye-ai *domain* prompts
+  that neither the sibling nor core provides.
+- **Clinical-row indexing is opt-in.** `_DEFAULT_TABLES` is empty;
+  `EYE_AI_DERIVA_MCP_TABLES` (comma-separated `schema:table`) turns it on.
+  With no override the plugin registers no `rag_dataset_indexer` — only
+  the papers `rag_github_source` and the prompts. This keeps the default
+  deployment from indexing clinical rows until an operator opts in with a
+  vetted table list.
 - **Flat enricher, no FK joins.** Eye-ai's categorical FKs reference the
   vocabulary's `Name` column, so the fetched row already carries readable
   labels — the flat row-to-Markdown render is sufficient, no resolve
