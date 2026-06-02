@@ -5,13 +5,16 @@ from __future__ import annotations
 from eye_ai_deriva_mcp_plugin import config
 
 
-def test_default_hosts():
-    assert config.eye_ai_hosts({}) == {"www.eye-ai.org", "dev.eye-ai.org"}
+def test_default_host():
+    assert config.eye_ai_host({}) == "www.eye-ai.org"
 
 
-def test_hosts_env_override():
-    env = {"EYE_AI_DERIVA_MCP_HOSTS": "a.eye-ai.org, b.eye-ai.org"}
-    assert config.eye_ai_hosts(env) == {"a.eye-ai.org", "b.eye-ai.org"}
+def test_host_env_override():
+    assert config.eye_ai_host({"EYE_AI_DERIVA_MCP_HOST": "dev.eye-ai.org"}) == "dev.eye-ai.org"
+
+
+def test_host_env_override_blank_falls_back_to_default():
+    assert config.eye_ai_host({"EYE_AI_DERIVA_MCP_HOST": "  "}) == "www.eye-ai.org"
 
 
 def test_default_tables_empty():

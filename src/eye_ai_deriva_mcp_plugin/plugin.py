@@ -3,16 +3,21 @@
 ``register(ctx)`` is called once at server startup by deriva-mcp-core's
 plugin loader (subject to ``DERIVA_MCP_PLUGIN_ALLOWLIST``). It wires:
 
-1. One ``ctx.rag_dataset_indexer`` per (host, table) in the configured
-   set. Each indexer renders eye-ai clinical rows to Markdown and writes
-   them to the catalog-public ``enriched:`` RAG source. ``is_public=True``
-   is correct because the eye-ai catalog has auth-gating but no row-level
-   ACLs -- every authorized user sees the same rows.
+1. One ``ctx.rag_dataset_indexer`` per configured table, scoped to the
+   single eye-ai host. Each indexer renders eye-ai clinical rows to
+   Markdown and writes them to the catalog-public ``enriched:`` RAG
+   source. ``is_public=True`` is correct because the eye-ai catalog has
+   auth-gating but no row-level ACLs -- every authorized user sees the
+   same rows.
 2. One ``ctx.rag_github_source`` for the eye-ai-rag-docs repo, whose
    ``markdown/`` directory holds section-aware Markdown of the project's
    research papers. The framework crawls it (public repo, ``.md`` only)
    and chunks each file by its section headings.
-3. Three eye-ai domain MCP prompts (``eye-ai-assistant``,
+3. One ``ctx.rag_web_source`` for the AI-READI documentation site
+   (``https://docs.aireadi.org``). AI-READI is a public multimodal
+   diabetic-eye dataset that is one of the eye-ai catalog's data
+   sources; its docs give the LLM context on that data.
+4. Three eye-ai domain MCP prompts (``eye-ai-assistant``,
    ``find-images``, ``explore-diagnosis``).
 
 The framework owns fetching, chunking, TTL-gating, credential handling,
@@ -54,15 +59,28 @@ _PAPERS_RAG_SOURCE = {
     "doc_type": "eye-ai-paper",
 }
 
+# The AI-READI documentation website. AI-READI is a public multimodal
+# diabetic-eye dataset ingested into the eye-ai catalog; its docs site
+# describes the data. ``allowed_domains`` keeps the crawl on the docs
+# subdomain (no off-site link following); ``max_pages`` bounds it.
+_AIREADI_WEB_SOURCE = {
+    "name": "aireadi-docs",
+    "base_url": "https://docs.aireadi.org",
+    "max_pages": 200,
+    "doc_type": "aireadi-docs",
+    "allowed_domains": ["docs.aireadi.org"],
+}
+
 
 def register(ctx: PluginContext) -> None:
-    """Register the eye-ai RAG indexers, papers source, and domain prompts.
+    """Register the eye-ai RAG indexers, doc sources, and domain prompts.
 
-    Declares one ``rag_dataset_indexer`` per (host, schema, table) in the
-    configured set, the eye-ai-rag-docs papers ``rag_github_source``, then
-    registers the eye-ai domain prompts. All RAG registrations are no-ops
-    when RAG is disabled (``DERIVA_MCP_RAG_ENABLED=false``); the prompts
-    always register.
+    Declares one ``rag_dataset_indexer`` per configured table (scoped to
+    the single eye-ai host), the eye-ai-rag-docs papers
+    ``rag_github_source``, the AI-READI ``rag_web_source``, then registers
+    the eye-ai domain prompts. All RAG registrations are no-ops when RAG
+    is disabled (``DERIVA_MCP_RAG_ENABLED=false``); the prompts always
+    register.
 
     Args:
         ctx: PluginContext supplied by deriva-mcp-core at startup.
@@ -75,23 +93,23 @@ def register(ctx: PluginContext) -> None:
         >>> # ctx provided by the framework
         >>> register(ctx)  # doctest: +SKIP
     """
-    hosts = sorted(config.eye_ai_hosts(ctx.env))
+    hostname = config.eye_ai_host(ctx.env)
     tables = config.eye_ai_tables(ctx.env)
     ttl = config.index_ttl_seconds(ctx.env)
 
-    for hostname in hosts:
-        for schema, table in tables:
-            ctx.rag_dataset_indexer(
-                schema=schema,
-                table=table,
-                enricher=make_enricher(table),
-                doc_type=_DOC_TYPE,
-                ttl_seconds=ttl,
-                hostname=hostname,
-                auto_enrich=True,
-                is_public=True,
-            )
+    for schema, table in tables:
+        ctx.rag_dataset_indexer(
+            schema=schema,
+            table=table,
+            enricher=make_enricher(table),
+            doc_type=_DOC_TYPE,
+            ttl_seconds=ttl,
+            hostname=hostname,
+            auto_enrich=True,
+            is_public=True,
+        )
 
     ctx.rag_github_source(**_PAPERS_RAG_SOURCE)
+    ctx.rag_web_source(**_AIREADI_WEB_SOURCE)
 
     prompts.register(ctx)

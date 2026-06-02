@@ -12,17 +12,23 @@ co-located `deriva-ml-mcp` plugin. The deployable MCP server is
 
 The indexing mechanism is **declarative**, matching
 `facebase-deriva-mcp-plugin`: `register()` calls
-`ctx.rag_dataset_indexer(...)` per (host, table), and the framework owns
-fetching, chunking, TTL-gating, credential handling, source naming, and
-the on-connect/background execution. The plugin only supplies *what* to
-index (the table list) and *how to render* a row (the enricher).
+`ctx.rag_dataset_indexer(...)` per configured table (scoped to the single
+eye-ai host), plus a `rag_github_source` (the eye-ai-rag-docs papers) and
+a `rag_web_source` (the AI-READI docs site). The framework owns fetching,
+chunking, TTL-gating, credential handling, source naming, and the
+on-connect/background execution. The plugin only supplies *what* to index
+(the table list + source URLs) and *how to render* a row (the enricher).
+
+The server runs against a single eye-ai catalog, so indexers are scoped
+to one host (`config.eye_ai_host`, default `www.eye-ai.org`, override
+`EYE_AI_DERIVA_MCP_HOST`) -- not a host set.
 
 ## Architecture
 
 ```
 src/eye_ai_deriva_mcp_plugin/
-├── plugin.py     # register(ctx): rag_dataset_indexer loop + prompts.register
-├── config.py     # host set / table list / TTL (env-overridable)
+├── plugin.py     # register(ctx): rag_dataset_indexer + rag_github_source + rag_web_source + prompts
+├── config.py     # host / table list / TTL (env-overridable)
 ├── enricher.py   # make_enricher(table) -> async (row, catalog) -> Markdown
 └── prompts.py    # register(ctx): 3 eye-ai domain MCP prompts
 ```

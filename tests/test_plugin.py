@@ -15,23 +15,36 @@ def test_register_declares_no_indexers_by_default(ctx):
     assert ctx._rag_dataset_indexers == []
 
 
-def test_register_declares_one_indexer_per_host_table_when_configured(ctx):
+def test_register_declares_one_indexer_per_table_when_configured(ctx):
     # With the table env override set, register() declares one indexer per
-    # (host, schema, table) in the cross product.
+    # table, all scoped to the single configured host.
     ctx.env["EYE_AI_DERIVA_MCP_TABLES"] = "eye-ai:Subject,eye-ai:Image"
     register(ctx)
-    hosts = config.eye_ai_hosts(ctx.env)
+    host = config.eye_ai_host(ctx.env)
     tables = config.eye_ai_tables(ctx.env)
     indexers = ctx._rag_dataset_indexers
-    assert len(indexers) == len(hosts) * len(tables) == 4
-    # Every indexer is the catalog-public, auto-enriched shape.
+    assert len(indexers) == len(tables) == 2
+    # Every indexer is the catalog-public, auto-enriched shape, scoped to
+    # the single host.
     assert all(ix.is_public for ix in indexers)
     assert all(ix.auto_enrich for ix in indexers)
     assert all(ix.doc_type == "eye-ai-data" for ix in indexers)
-    # Coverage is exactly the (host, schema, table) cross product.
+    assert all(ix.hostname == host for ix in indexers)
     declared = {(ix.hostname, ix.schema, ix.table) for ix in indexers}
-    expected = {(h, s, t) for h in hosts for s, t in tables}
+    expected = {(host, s, t) for s, t in tables}
     assert declared == expected
+
+
+def test_register_declares_the_aireadi_web_source(ctx):
+    register(ctx)
+    sources = [s for s in ctx._rag_web_sources if s.name == "aireadi-docs"]
+    assert len(sources) == 1, "expected exactly one aireadi-docs web source"
+    src = sources[0]
+    assert src.base_url == "https://docs.aireadi.org"
+    assert src.doc_type == "aireadi-docs"
+    # Crawl stays on the docs subdomain (no off-site link following).
+    assert src.allowed_domains == ["docs.aireadi.org"]
+    assert src.max_pages == 200
 
 
 def test_register_declares_the_papers_github_source(ctx):
