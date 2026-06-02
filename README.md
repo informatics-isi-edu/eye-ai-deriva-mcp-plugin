@@ -17,8 +17,8 @@ Pre-alpha. Versioned `v0.x.y`.
 ## What it does
 
 - **Declarative RAG indexing.** `register()` declares one
-  `ctx.rag_dataset_indexer` per (host, table) in the configured set,
-  using the same framework API as
+  `ctx.rag_dataset_indexer` per configured table (scoped to the single
+  eye-ai host), using the same framework API as
   [facebase-deriva-mcp-plugin](https://github.com/informatics-isi-edu/facebase-deriva-mcp-plugin).
   The framework fetches each configured `eye-ai:<table>`, calls the
   plugin's enricher to render each row to Markdown, and writes the
@@ -33,6 +33,14 @@ Pre-alpha. Versioned `v0.x.y`.
   when the operator sets `DERIVA_MCP_RAG_AUTO_ENRICH=true`. Manual
   re-indexing is available through the framework's `rag_ingest_datasets`
   tool.
+- **Research-paper index.** A `ctx.rag_github_source` crawls the
+  [eye-ai-rag-docs](https://github.com/eye-ai-usc/eye-ai-rag-docs) repo's
+  `markdown/` directory (section-aware Markdown of the project's papers),
+  searchable under `doc_type="eye-ai-paper"`.
+- **AI-READI docs index.** A `ctx.rag_web_source` crawls
+  [`https://docs.aireadi.org`](https://docs.aireadi.org) (AI-READI is a
+  public multimodal diabetic-eye dataset that is one of the eye-ai
+  catalog's data sources), searchable under `doc_type="aireadi-docs"`.
 - **Domain prompts.** Three MCP prompts — `eye-ai-assistant`,
   `find-images`, `explore-diagnosis` — prime an LLM for eye-ai
   ophthalmology / retinal-imaging workflows. They complement (do not
@@ -50,7 +58,7 @@ Pre-alpha. Versioned `v0.x.y`.
 
 | Env var | Default | Meaning |
 |---|---|---|
-| `EYE_AI_DERIVA_MCP_HOSTS` | `www.eye-ai.org,dev.eye-ai.org` | Hosts each indexer is scoped to |
+| `EYE_AI_DERIVA_MCP_HOST` | `www.eye-ai.org` | The single eye-ai host the indexers are scoped to |
 | `EYE_AI_DERIVA_MCP_TABLES` | _(empty)_ | `schema:table` list of clinical-row tables to index |
 | `EYE_AI_DERIVA_MCP_INDEX_TTL_SECONDS` | `86400` | Re-index TTL |
 | `DERIVA_MCP_RAG_ENABLED` | `false` | Must be `true` for any indexing |

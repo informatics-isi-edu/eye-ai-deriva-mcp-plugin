@@ -9,7 +9,7 @@ TTL without code changes.
 
 from __future__ import annotations
 
-_DEFAULT_HOSTS = ("www.eye-ai.org", "dev.eye-ai.org")
+_DEFAULT_HOST = "www.eye-ai.org"
 
 # Clinical-row table list -- empty by default, opt-in via the
 # ``EYE_AI_DERIVA_MCP_TABLES`` env override. With no override, the plugin
@@ -24,26 +24,26 @@ _DEFAULT_TABLES: tuple[tuple[str, str], ...] = ()
 _DEFAULT_TTL_SECONDS = 86400  # 24h
 
 
-def eye_ai_hosts(env: dict[str, str]) -> set[str]:
-    """Return the set of hostnames that trigger eye-ai indexing.
+def eye_ai_host(env: dict[str, str]) -> str:
+    """Return the single hostname that scopes eye-ai indexing.
 
-    Env override ``EYE_AI_DERIVA_MCP_HOSTS`` is a comma-separated list.
+    The server runs against one eye-ai catalog, so the clinical-row
+    indexers are scoped to one host. Env override
+    ``EYE_AI_DERIVA_MCP_HOST`` sets it (e.g. ``"dev.eye-ai.org"``).
 
     Args:
         env: The merged environment map (``ctx.env``).
 
     Returns:
-        Set of hostnames. The on-connect hook no-ops on any host not
-        in this set.
+        The eye-ai hostname the indexers are scoped to.
 
     Example:
-        >>> sorted(eye_ai_hosts({}))
-        ['dev.eye-ai.org', 'www.eye-ai.org']
+        >>> eye_ai_host({})
+        'www.eye-ai.org'
+        >>> eye_ai_host({"EYE_AI_DERIVA_MCP_HOST": "dev.eye-ai.org"})
+        'dev.eye-ai.org'
     """
-    raw = env.get("EYE_AI_DERIVA_MCP_HOSTS")
-    if not raw:
-        return set(_DEFAULT_HOSTS)
-    return {h.strip() for h in raw.split(",") if h.strip()}
+    return env.get("EYE_AI_DERIVA_MCP_HOST", "").strip() or _DEFAULT_HOST
 
 
 def eye_ai_tables(env: dict[str, str]) -> list[tuple[str, str]]:
