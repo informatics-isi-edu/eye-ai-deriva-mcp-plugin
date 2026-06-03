@@ -60,6 +60,20 @@ def test_register_declares_the_papers_github_source(ctx):
     assert src.doc_type == "eye-ai-paper"
 
 
+def test_register_declares_the_retfound_github_source(ctx):
+    register(ctx)
+    sources = [s for s in ctx._rag_sources if s.name == "retfound-multimodal-docs"]
+    assert len(sources) == 1, "expected exactly one retfound-multimodal-docs GitHub source"
+    src = sources[0]
+    assert src.repo_owner == "eye-ai-usc"
+    assert src.repo_name == "RETFoundMultimodal"
+    assert src.branch == "main"
+    # Docs live at the repo root, so the whole tree is crawled; the .md-only
+    # crawler still ignores the model's Python sources / notebooks.
+    assert src.path_prefix == ""
+    assert src.doc_type == "eye-ai-model"
+
+
 def test_register_declares_the_domain_prompts(ctx):
     register(ctx)
     assert set(ctx._mcp.prompts) == {"eye-ai-assistant", "find-images", "explore-diagnosis"}

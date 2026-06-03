@@ -13,8 +13,9 @@ co-located `deriva-ml-mcp` plugin. The deployable MCP server is
 The indexing mechanism is **declarative**, matching
 `facebase-deriva-mcp-plugin`: `register()` calls
 `ctx.rag_dataset_indexer(...)` per configured table (scoped to the single
-eye-ai host), plus a `rag_github_source` (the eye-ai-rag-docs papers) and
-a `rag_web_source` (the AI-READI docs site). The framework owns fetching,
+eye-ai host), plus two `rag_github_source` declarations (the eye-ai-rag-docs
+papers and the RETFoundMultimodal model docs) and a `rag_web_source` (the
+AI-READI docs site). The framework owns fetching,
 chunking, TTL-gating, credential handling, source naming, and the
 on-connect/background execution. The plugin only supplies *what* to index
 (the table list + source URLs) and *how to render* a row (the enricher).
@@ -69,6 +70,22 @@ src/eye_ai_deriva_mcp_plugin/
   on-connect execution is operator-gated by `DERIVA_MCP_RAG_AUTO_ENRICH`.
   Manual re-indexing is the framework's `rag_ingest_datasets` tool —
   this plugin ships no maintenance tool.
+- **All three doc sources autoload at startup.** The two GitHub sources
+  (papers, RETFoundMultimodal) are in the framework's default startup-crawl
+  pass and autoload whenever RAG is enabled. The AI-READI `rag_web_source`
+  is the one exception: the framework excludes *all* web sources from the
+  startup pass by default (the global `DERIVA_MCP_RAG_AUTO_UPDATE_WEB_SOURCES`
+  is off, because a web crawl competes with ERMrest load on the same host).
+  The intended eye-ai deployment therefore sets
+  `DERIVA_MCP_RAG_AUTO_UPDATE_WEB_SOURCES=true` so the web source autoloads
+  alongside the GitHub ones. This env var is the only knob the framework
+  exposes for web-source startup crawling (there is **no** per-source flag),
+  and since this plugin declares only one web source, the global switch
+  effectively governs just it — so do **not** patch `deriva-mcp-core` to add
+  a per-source flag. If the var is left unset, the web source is ingested
+  on demand via `rag_ingest` / `rag_update_docs` instead. All startup
+  crawling is TTL-gated (`startup_ttl_hours`) and only runs when RAG is
+  enabled and `auto_update` (the master startup-crawl switch) is on.
 
 ## Conventions (shared workspace rules)
 
@@ -118,6 +135,23 @@ docker-compose --env-file ~/.deriva-docker/env/localhost.env up -d deriva-mcp-te
 ```
 
 `scripts/rebuild-deriva-docker-mcp.sh` wraps these.
+
+### RAG env vars (autoload posture)
+
+For the eye-ai deployment all RAG doc sources should autoload at startup.
+The relevant framework env vars (set in the deriva-docker env file):
+
+```bash
+DERIVA_MCP_RAG_ENABLED=true                    # turn RAG on at all
+DERIVA_MCP_RAG_AUTO_UPDATE=true                # master startup-crawl switch (default true)
+DERIVA_MCP_RAG_AUTO_UPDATE_WEB_SOURCES=true    # include the AI-READI web source in the startup crawl
+```
+
+The two GitHub sources (papers, RETFoundMultimodal) autoload with just
+`DERIVA_MCP_RAG_ENABLED=true` + the master switch; only the web source
+needs `AUTO_UPDATE_WEB_SOURCES`. To also auto-index clinical rows (opt-in,
+off by default) an operator additionally sets
+`EYE_AI_DERIVA_MCP_TABLES=...` and `DERIVA_MCP_RAG_AUTO_ENRICH=true`.
 
 ## Versioning
 
