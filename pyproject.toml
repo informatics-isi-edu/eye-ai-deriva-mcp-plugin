@@ -86,4 +86,4 @@ omit = ["tests/*"]
 allow_dirty = false
 commit = true
 tag = true
-current_version = "0.1.1"
+current_version = "0.1.2"
