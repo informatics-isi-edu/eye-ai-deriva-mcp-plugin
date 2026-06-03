@@ -61,7 +61,7 @@ override-dependencies = [
 ]
 
 [tool.uv.sources]
-deriva-mcp-core = { path = "../deriva-mcp-core", editable = true }
+deriva-mcp-core = { git = "https://github.com/informatics-isi-edu/deriva-mcp-core.git" }
 deriva-ml = { git = "https://github.com/informatics-isi-edu/deriva-ml.git" }
 
 [tool.ruff]
